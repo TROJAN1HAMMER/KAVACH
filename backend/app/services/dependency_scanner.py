@@ -1,0 +1,279 @@
+"""
+KAVACH — Dependency Intelligence Engine
+Uses pip-audit and CycloneDX to detect vulnerable dependencies.
+
+Responsibilities:
+  - Generate CycloneDX SBOM from requirements files
+  - Run pip-audit to identify CVEs
+  - Normalize findings into RawFinding format
+  - Store SBOM JSON for later export
+
+Input:  repository_path (str | Path), reports_dir (str | Path)
+Output: tuple[list[RawFinding], dict | None]  — (findings, sbom_dict)
+"""
+
+import json
+import subprocess
+import os
+from pathlib import Path
+from typing import Any
+import structlog
+
+from app.schemas.finding import RawFinding
+
+logger = structlog.get_logger(__name__)
+
+
+# ── CVSS helpers ──────────────────────────────────────────────────────────────
+
+def _cvss_to_severity(cvss: float) -> str:
+    if cvss >= 9.0:
+        return "CRITICAL"
+    elif cvss >= 7.0:
+        return "HIGH"
+    elif cvss >= 4.0:
+        return "MEDIUM"
+    elif cvss > 0:
+        return "LOW"
+    return "INFO"
+
+
+# ── pip-audit Scanner ─────────────────────────────────────────────────────────
+
+def _run_pip_audit(req_file: Path) -> list[dict[str, Any]]:
+    """Run pip-audit against a requirements file, return raw JSON results."""
+    try:
+        result = subprocess.run(
+            [
+                "pip-audit",
+                "--requirement", str(req_file),
+                "--format", "json",
+                "--progress-spinner", "off",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        # pip-audit exits non-zero when vulnerabilities found (exit code 1)
+        # so we attempt to parse regardless of returncode
+        stdout = result.stdout.strip()
+        if not stdout:
+            logger.warning("dependency_scanner.pip_audit.empty_output", file=str(req_file))
+            return []
+
+        data = json.loads(stdout)
+        # pip-audit JSON format: {"dependencies": [...]}
+        return data.get("dependencies", [])
+
+    except FileNotFoundError:
+        logger.warning("dependency_scanner.pip_audit_not_found")
+        return []
+    except subprocess.TimeoutExpired:
+        logger.error("dependency_scanner.pip_audit.timeout")
+        return []
+    except json.JSONDecodeError as exc:
+        logger.warning("dependency_scanner.pip_audit.json_error", error=str(exc))
+        return []
+    except Exception as exc:
+        logger.exception("dependency_scanner.pip_audit.error", error=str(exc))
+        return []
+
+
+def _parse_pip_audit_results(raw: list[dict[str, Any]]) -> list[RawFinding]:
+    """Convert pip-audit dependency list to RawFinding objects."""
+    findings: list[RawFinding] = []
+
+    for dep in raw:
+        package = dep.get("name", "unknown")
+        version = dep.get("version", "unknown")
+        vulns = dep.get("vulns", [])
+
+        for vuln in vulns:
+            vuln_id = vuln.get("id", "CVE-UNKNOWN")
+            description = vuln.get("description", "No description available.")
+            fix_versions = vuln.get("fix_versions", [])
+
+            # Extract CVSS from aliases or default
+            cvss = 5.0
+            aliases = vuln.get("aliases", [])
+            # pip-audit doesn't always include CVSS — we derive from severity keywords
+            desc_lower = description.lower()
+            if any(k in desc_lower for k in ["remote code", "arbitrary code", "rce"]):
+                cvss = 9.5
+            elif any(k in desc_lower for k in ["sql inject", "command inject", "xxe"]):
+                cvss = 9.0
+            elif any(k in desc_lower for k in ["privilege escalation", "bypass auth"]):
+                cvss = 8.0
+            elif any(k in desc_lower for k in ["denial of service", "dos", "crash"]):
+                cvss = 6.5
+            elif any(k in desc_lower for k in ["information disclosure", "path traversal"]):
+                cvss = 6.0
+            else:
+                cvss = 5.0
+
+            fix_note = f" Fixed in: {', '.join(fix_versions)}" if fix_versions else ""
+
+            findings.append(
+                RawFinding(
+                    title=f"Vulnerable Dependency: {package} {version} [{vuln_id}]",
+                    severity=_cvss_to_severity(cvss),
+                    category="vulnerable_dependency",
+                    source="pip-audit",
+                    cvss=cvss,
+                    file_path=None,
+                    line_number=None,
+                    description=f"{description}{fix_note}",
+                    package=package,
+                    package_version=version,
+                    cve=vuln_id,
+                )
+            )
+
+    return findings
+
+
+# ── SBOM Generation ───────────────────────────────────────────────────────────
+
+def _generate_sbom(req_file: Path, output_path: Path) -> dict | None:
+    """
+    Generate a CycloneDX SBOM using cyclonedx-bom CLI.
+    Returns the parsed SBOM dict or None on failure.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "cyclonedx-py",
+                "requirements",
+                str(req_file),
+                "--output-format", "JSON",
+                "--outfile", str(output_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if output_path.exists():
+            sbom_data = json.loads(output_path.read_text(encoding="utf-8"))
+            logger.info("dependency_scanner.sbom.generated", path=str(output_path))
+            return sbom_data
+        else:
+            logger.warning("dependency_scanner.sbom.output_not_found", stderr=result.stderr[:300])
+            return None
+
+    except FileNotFoundError:
+        logger.warning("dependency_scanner.cyclonedx_not_found — generating minimal SBOM")
+        return _generate_minimal_sbom(req_file)
+    except subprocess.TimeoutExpired:
+        logger.error("dependency_scanner.sbom.timeout")
+        return None
+    except Exception as exc:
+        logger.exception("dependency_scanner.sbom.error", error=str(exc))
+        return None
+
+
+def _generate_minimal_sbom(req_file: Path) -> dict:
+    """
+    Fallback: Parse requirements.txt manually and produce a minimal CycloneDX SBOM.
+    """
+    components = []
+    try:
+        for line in req_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # Handle formats: package==version, package>=version, package
+            for sep in ["==", ">=", "<=", "~=", "!="]:
+                if sep in line:
+                    name, version = line.split(sep, 1)
+                    version = version.split(",")[0].strip()
+                    break
+            else:
+                name, version = line, "unknown"
+
+            name = name.strip()
+            components.append({
+                "type": "library",
+                "name": name,
+                "version": version,
+                "purl": f"pkg:pypi/{name.lower()}@{version}",
+            })
+    except Exception:
+        pass
+
+    return {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.4",
+        "version": 1,
+        "metadata": {
+            "tools": [{"name": "KAVACH", "version": "1.0.0"}],
+            "component": {"type": "application", "name": "scanned-repository"},
+        },
+        "components": components,
+    }
+
+
+# ── Main Entry Point ──────────────────────────────────────────────────────────
+
+def run_dependency_scan(
+    repo_path: str | Path,
+    reports_dir: str | Path,
+    scan_id: str,
+) -> tuple[list[RawFinding], dict | None]:
+    """
+    Run dependency vulnerability scan on the repository.
+
+    Steps:
+      1. Locate requirements files (requirements.txt, requirements/*.txt)
+      2. Run pip-audit against each
+      3. Generate CycloneDX SBOM
+      4. Return normalized findings + SBOM dict
+
+    Returns:
+        (findings, sbom_dict)
+    """
+    repo_path = Path(repo_path).resolve()
+    reports_dir = Path(reports_dir).resolve()
+    reports_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("dependency_scanner.start", repo_path=str(repo_path))
+
+    # ── Find requirements files ──
+    req_files: list[Path] = []
+    for pattern in ["requirements.txt", "requirements/*.txt", "requirements-*.txt"]:
+        req_files.extend(repo_path.glob(pattern))
+
+    if not req_files:
+        logger.info("dependency_scanner.no_requirements_found")
+        # Return empty findings + minimal placeholder SBOM
+        return [], {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.4",
+            "version": 1,
+            "components": [],
+            "metadata": {"component": {"name": "no-requirements-found"}},
+        }
+
+    # ── Run pip-audit ──
+    all_raw: list[dict[str, Any]] = []
+    for req_file in req_files:
+        logger.info("dependency_scanner.scanning", file=str(req_file))
+        all_raw.extend(_run_pip_audit(req_file))
+
+    findings = _parse_pip_audit_results(all_raw)
+    logger.info("dependency_scanner.findings", count=len(findings))
+
+    # ── Generate SBOM using first req file found ──
+    sbom_output_path = reports_dir / f"{scan_id}_sbom.json"
+    sbom = _generate_sbom(req_files[0], sbom_output_path)
+
+    # Save fallback SBOM if generation failed
+    if sbom is None:
+        sbom = _generate_minimal_sbom(req_files[0])
+
+    # Always write SBOM to disk
+    sbom_output_path.write_text(json.dumps(sbom, indent=2), encoding="utf-8")
+    logger.info("dependency_scanner.sbom.saved", path=str(sbom_output_path))
+
+    return findings, sbom
