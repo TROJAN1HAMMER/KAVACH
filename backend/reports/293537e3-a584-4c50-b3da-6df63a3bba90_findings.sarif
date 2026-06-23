@@ -1,0 +1,32 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "KAVACH",
+          "version": "1.0.0",
+          "informationUri": "https://kavach.security",
+          "rules": []
+        }
+      },
+      "results": [],
+      "properties": {
+        "scan_id": "293537e3-a584-4c50-b3da-6df63a3bba90",
+        "repository": "Ai-Proj-main",
+        "scanDate": "2026-06-23T02:57:44.182096+00:00"
+      },
+      "artifacts": [
+        {
+          "location": {
+            "uri": "%SRCROOT%"
+          },
+          "description": {
+            "text": "Source repository: Ai-Proj-main"
+          }
+        }
+      ]
+    }
+  ]
+}

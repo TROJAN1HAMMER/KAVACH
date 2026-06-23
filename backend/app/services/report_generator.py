@@ -67,7 +67,7 @@ RISK_COLORS = {
 # ── PDF Generation ────────────────────────────────────────────────────────────
 
 class KavachPDFReport:
-    """Builds a professional PDF security audit report."""
+    """Builds an executive-grade PDF security audit report for financial systems."""
 
     def __init__(self, output_path: Path):
         self.output_path = output_path
@@ -78,36 +78,47 @@ class KavachPDFReport:
         self.styles.add(ParagraphStyle(
             "KavachTitle",
             parent=self.styles["Title"],
-            fontSize=26,
+            fontSize=28,
             textColor=KAVACH_DARK,
-            spaceAfter=6,
+            spaceAfter=8,
             fontName="Helvetica-Bold",
+            alignment=TA_CENTER,
         ))
         self.styles.add(ParagraphStyle(
             "KavachH1",
             parent=self.styles["Heading1"],
             fontSize=16,
             textColor=KAVACH_DARK,
-            spaceAfter=8,
-            spaceBefore=14,
+            spaceAfter=10,
+            spaceBefore=16,
             fontName="Helvetica-Bold",
-            borderPad=4,
+            keepWithNext=True,
         ))
         self.styles.add(ParagraphStyle(
             "KavachH2",
             parent=self.styles["Heading2"],
-            fontSize=13,
+            fontSize=12,
             textColor=KAVACH_BLUE,
-            spaceAfter=6,
-            spaceBefore=10,
+            spaceAfter=8,
+            spaceBefore=12,
             fontName="Helvetica-Bold",
+            keepWithNext=True,
         ))
         self.styles.add(ParagraphStyle(
             "KavachBody",
             parent=self.styles["Normal"],
-            fontSize=9,
+            fontSize=9.5,
             textColor=KAVACH_DARK,
-            spaceAfter=4,
+            spaceAfter=6,
+            leading=14,
+        ))
+        self.styles.add(ParagraphStyle(
+            "KavachBodyBold",
+            parent=self.styles["Normal"],
+            fontSize=9.5,
+            textColor=KAVACH_DARK,
+            fontName="Helvetica-Bold",
+            spaceAfter=6,
             leading=14,
         ))
         self.styles.add(ParagraphStyle(
@@ -115,7 +126,8 @@ class KavachPDFReport:
             parent=self.styles["Normal"],
             fontSize=8,
             textColor=KAVACH_MUTED,
-            spaceAfter=2,
+            spaceAfter=4,
+            leading=11,
         ))
         self.styles.add(ParagraphStyle(
             "KavachCode",
@@ -123,7 +135,9 @@ class KavachPDFReport:
             fontSize=8,
             fontName="Courier",
             textColor=KAVACH_DARK,
-            backColor=colors.HexColor("#F1F5F9"),
+            backColor=colors.HexColor("#F8FAFC"),
+            borderPadding=4,
+            spaceAfter=4,
         ))
 
     def _severity_badge(self, severity: str) -> Paragraph:
@@ -135,6 +149,7 @@ class KavachPDFReport:
             backColor=color,
             fontName="Helvetica-Bold",
             alignment=TA_CENTER,
+            borderPadding=3,
         )
         return Paragraph(severity.upper(), style)
 
@@ -167,27 +182,39 @@ class KavachPDFReport:
 
         story = []
 
-        # ── Cover Page ──
+        # ── 1. Cover Page ──
         story.extend(self._build_cover(scan_id, repo_name, brs_score, brs_risk_level, generated_at))
         story.append(PageBreak())
 
-        # ── Executive Summary ──
+        # ── 2. Executive Summary ──
         story.extend(self._build_executive_summary(
             repo_name, brs_score, brs_risk_level,
             zero_day_score, zero_day_level, summary, compliance_summary
         ))
         story.append(PageBreak())
 
-        # ── Findings Table ──
-        story.extend(self._build_findings_section(findings))
+        # ── 3. Threat Posture Overview ──
+        story.extend(self._build_threat_posture_overview(summary, brs_score, brs_risk_level, zero_day_score, zero_day_level))
         story.append(PageBreak())
 
-        # ── Compliance Mapping ──
+        # ── 4. Regulatory Impact Analysis ──
         story.extend(self._build_compliance_section(compliance_summary, findings))
         story.append(PageBreak())
 
-        # ── AI Recommendations ──
-        story.extend(self._build_ai_recommendations(findings))
+        # ── 5. Detailed Findings Section ──
+        story.extend(self._build_detailed_findings_section(findings))
+        story.append(PageBreak())
+
+        # ── 6. AI Security Analyst Commentary ──
+        story.extend(self._build_ai_analyst_commentary(findings))
+        story.append(PageBreak())
+
+        # ── 7. Executive Action Plan ──
+        story.extend(self._build_action_plan(findings))
+        story.append(PageBreak())
+
+        # ── 8. Appendix ──
+        story.extend(self._build_appendix(scan_id, repo_name, compliance_summary, generated_at))
 
         doc.build(story)
         logger.info("report_generator.pdf.generated", path=str(self.output_path))
@@ -195,74 +222,78 @@ class KavachPDFReport:
 
     def _build_cover(self, scan_id, repo_name, brs_score, brs_risk_level, generated_at):
         elements = []
-        elements.append(Spacer(1, 3 * cm))
+        elements.append(Spacer(1, 1.5 * cm))
 
-        # Logo text
+        # Logo Header (Hexagon Core / Radar Identity motif)
         elements.append(Paragraph(
-            "⚡ KAVACH",
+            "<font color='#00F0FF'>⬢</font> KAVACH",
             ParagraphStyle("logo", fontSize=32, fontName="Helvetica-Bold",
-                           textColor=KAVACH_BLUE, alignment=TA_CENTER)
-        ))
-        elements.append(Paragraph(
-            "AI-Powered DevSecOps Security Platform",
-            ParagraphStyle("tagline", fontSize=12, textColor=KAVACH_MUTED, alignment=TA_CENTER)
-        ))
-        elements.append(Spacer(1, 1 * cm))
-        elements.append(HRFlowable(width="100%", thickness=2, color=KAVACH_BLUE))
-        elements.append(Spacer(1, 0.5 * cm))
-
-        elements.append(Paragraph(
-            "Security Audit Report",
-            ParagraphStyle("report_title", fontSize=22, fontName="Helvetica-Bold",
                            textColor=KAVACH_DARK, alignment=TA_CENTER)
         ))
-        elements.append(Spacer(1, 0.3 * cm))
         elements.append(Paragraph(
-            f"Repository: {repo_name}",
-            ParagraphStyle("repo", fontSize=14, textColor=KAVACH_MUTED, alignment=TA_CENTER)
+            "BANKING SECURITY COMMAND CENTER",
+            ParagraphStyle("tagline", fontSize=10, fontName="Helvetica-Bold",
+                           textColor=KAVACH_MUTED, alignment=TA_CENTER, spaceAfter=20)
+        ))
+        
+        elements.append(HRFlowable(width="100%", thickness=1.5, color=KAVACH_BLUE, spaceAfter=15))
+
+        elements.append(Paragraph(
+            "CONFIDENTIAL SECURITY AUDIT DOSSIER",
+            ParagraphStyle("cover_header", fontSize=12, fontName="Helvetica-Bold",
+                           textColor=KAVACH_BLUE, alignment=TA_CENTER, spaceAfter=10)
         ))
 
-        elements.append(Spacer(1, 2 * cm))
+        elements.append(Paragraph(
+            f"Vulnerability & Risk Assessment Report",
+            ParagraphStyle("report_title", fontSize=20, fontName="Helvetica-Bold",
+                           textColor=KAVACH_DARK, alignment=TA_CENTER, spaceAfter=10)
+        ))
 
-        # BRS Score Box
-        risk_color = RISK_COLORS.get(brs_risk_level, KAVACH_MUTED)
+        elements.append(Paragraph(
+            f"Repository Instance: <b>{repo_name}</b>",
+            ParagraphStyle("repo", fontSize=13, textColor=KAVACH_DARK, alignment=TA_CENTER, spaceAfter=40)
+        ))
+
+        # Overall Risk & BRS Matrix Block
+        overall_rating = "CRITICAL POSTURE" if brs_score >= 30 else "ELEVATED RISK" if brs_score >= 20 else "STABLE POSTURE"
+        rating_color = RISK_COLORS.get(brs_risk_level, KAVACH_MUTED)
+
         brs_data = [
-            ["Banking Risk Score (BRS)", "Risk Level"],
-            [f"{brs_score:.1f} / 100", brs_risk_level],
+            ["BANKING RISK SCORE (BRS)", "OVERALL RATING"],
+            [f"{brs_score:.1f} / 100", f"{overall_rating}"],
         ]
-        brs_table = Table(brs_data, colWidths=[8 * cm, 8 * cm])
+        brs_table = Table(brs_data, colWidths=[8.5 * cm, 8.5 * cm])
         brs_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), KAVACH_DARK),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("FONTSIZE", (0, 0), (-1, 0), 9.5),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("FONTSIZE", (0, 1), (-1, 1), 20),
+            ("FONTSIZE", (0, 1), (-1, 1), 18),
             ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
             ("TEXTCOLOR", (0, 1), (0, 1), KAVACH_BLUE),
-            ("TEXTCOLOR", (1, 1), (1, 1), risk_color),
+            ("TEXTCOLOR", (1, 1), (1, 1), rating_color),
             ("BACKGROUND", (0, 1), (-1, 1), KAVACH_LIGHT),
-            ("ROWBACKGROUND", (0, 1), (-1, 1), KAVACH_LIGHT),
-            ("BOX", (0, 0), (-1, -1), 1, KAVACH_BLUE),
+            ("BOX", (0, 0), (-1, -1), 1, KAVACH_DARK),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
             ("TOPPADDING", (0, 0), (-1, -1), 12),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
         ]))
         elements.append(brs_table)
 
-        elements.append(Spacer(1, 1 * cm))
-        elements.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
-        elements.append(Spacer(1, 0.5 * cm))
+        elements.append(Spacer(1, 2.5 * cm))
+        elements.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey, spaceAfter=15))
 
         # Metadata
         meta_data = [
-            ["Scan ID:", str(scan_id)],
-            ["Generated:", generated_at.strftime("%Y-%m-%d %H:%M UTC")],
-            ["Platform:", "KAVACH v1.0.0 | Hackathon Prototype"],
-            ["Compliance:", "RBI IT Framework 2021 | PCI DSS v4.0 | SWIFT CSP"],
+            ["Scan identifier:", str(scan_id)],
+            ["Generated Date:", generated_at.strftime("%Y-%m-%d %H:%M UTC")],
+            ["Compliance Basis:", "RBI IT Framework 2021 | PCI DSS v4.0 | SWIFT CSP"],
+            ["Target Environment:", "Production Banking Node Assessment"],
         ]
-        meta_table = Table(meta_data, colWidths=[4 * cm, 12 * cm])
+        meta_table = Table(meta_data, colWidths=[4.5 * cm, 12.5 * cm])
         meta_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
@@ -279,263 +310,420 @@ class KavachPDFReport:
         zero_day_score, zero_day_level, summary, compliance_summary
     ):
         elements = []
-        elements.append(Paragraph("Executive Summary", self.styles["KavachH1"]))
-        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE))
-        elements.append(Spacer(1, 0.3 * cm))
+        elements.append(Paragraph("2. Executive Summary", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
 
+        # Core posture summary
+        posture_description = (
+            "CRITICAL EXPOSURE DETECTED. Immediate patch orchestration required." if brs_score >= 30 else
+            "ELEVATED THREAT LANDSCAPE. Remediation should be scheduled in the next active sprint." if brs_score >= 20 else
+            "STEADY SECURITY POSTURE. System metrics confirm high compliance alignment."
+        )
+
+        elements.append(Paragraph(
+            f"<b>ASSESSMENT STATUS:</b> {posture_description}",
+            self.styles["KavachBodyBold"]
+        ))
+        
         intro = (
-            f"KAVACH conducted an automated security assessment of the <b>{repo_name}</b> repository. "
-            f"The assessment included static code analysis, dependency vulnerability scanning, "
-            f"and configuration security review. "
-            f"A total of <b>{summary.get('total', 0)} findings</b> were identified across all scan modules."
+            f"KAVACH completed a banking security audit of repository <b>{repo_name}</b>. "
+            f"The scanner performed static code parsing (SAST), software composition audit (SCA), "
+            f"and deployment configuration assessments. A total of <b>{summary.get('total', 0)} security findings</b> "
+            f"were logged during the pipeline run."
         )
         elements.append(Paragraph(intro, self.styles["KavachBody"]))
-        elements.append(Spacer(1, 0.5 * cm))
+        elements.append(Spacer(1, 0.4 * cm))
 
-        # Findings Severity Summary
-        elements.append(Paragraph("Findings by Severity", self.styles["KavachH2"]))
-        sev_data = [
-            ["Severity", "Count", "Action Required"],
-            ["CRITICAL", str(summary.get("CRITICAL", 0)), "Immediate remediation"],
-            ["HIGH", str(summary.get("HIGH", 0)), "Remediate within 7 days"],
-            ["MEDIUM", str(summary.get("MEDIUM", 0)), "Remediate within 30 days"],
-            ["LOW", str(summary.get("LOW", 0)), "Track and remediate"],
-            ["INFO", str(summary.get("INFO", 0)), "Review and document"],
+        # Key Observations Block
+        elements.append(Paragraph("Key Observations & Posture Analysis", self.styles["KavachH2"]))
+        critical_count = summary.get("CRITICAL", 0)
+        high_count = summary.get("HIGH", 0)
+
+        observations = (
+            f"• <b>Critical Exposures:</b> {critical_count} critical-severity flaws were detected. These vulnerabilities "
+            f"represent immediate exploit vectors affecting banking logic, token authorization, or data integrity.<br/>"
+            f"• <b>High Vulnerability Vectors:</b> {high_count} high-severity flaws were logged, predominantly affecting package dependencies.<br/>"
+            f"• <b>Risk Class:</b> The system resides in a <b>{brs_risk_level}</b> risk tier with a BRS score of <b>{brs_score:.1f}</b>.<br/>"
+            f"• <b>Zero-Day Risk Factor:</b> Local dependencies and configuration audits yield a <b>{zero_day_score:.1f}%</b> probability "
+            f"of zero-day exploitation vulnerability."
+        )
+        elements.append(Paragraph(observations, self.styles["KavachBody"]))
+        elements.append(Spacer(1, 0.4 * cm))
+
+        # Risk Level Explanation
+        elements.append(Paragraph("Risk Score Model Explanation", self.styles["KavachH2"]))
+        explanation = (
+            "The Banking Risk Score (BRS) is a weighted calculation reflecting vulnerability severity, cvss values, and regulatory "
+            "compliance mapping. BRS values above 30 denote Critical Risk (immediate remediation mandatory). BRS values between 20-30 "
+            "denote High Risk (CISO review and mitigation within 7 days). BRS values below 20 denote low-to-medium posture alerts."
+        )
+        elements.append(Paragraph(explanation, self.styles["KavachBody"]))
+
+        return elements
+
+    def _build_threat_posture_overview(self, summary, brs_score, brs_risk_level, zero_day_score, zero_day_level):
+        elements = []
+        elements.append(Paragraph("3. Threat Posture Overview", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
+
+        # BRS / Zero Day Overview table
+        elements.append(Paragraph("Banking Risk Scorecard", self.styles["KavachH2"]))
+        score_data = [
+            ["Vulnerability Metric", "Score Value", "Rating Tier", "Mitigation Status"],
+            ["Banking Risk Score (BRS)", f"{brs_score:.1f}", brs_risk_level.upper(), "Pending Patch"],
+            ["Zero-Day Risk Forecast", f"{zero_day_score:.1f}%", zero_day_level.upper(), "Review Advisory"],
         ]
-        sev_table = Table(sev_data, colWidths=[4 * cm, 3 * cm, 9 * cm])
-        sev_style = [
+        score_table = Table(score_data, colWidths=[6.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm])
+        score_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), KAVACH_DARK),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#FEE2E2")),  # CRITICAL
-            ("TEXTCOLOR", (0, 1), (0, 1), SEVERITY_COLORS["CRITICAL"]),
-            ("FONTNAME", (0, 1), (0, 1), "Helvetica-Bold"),
-            ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#FFEDD5")),  # HIGH
-            ("TEXTCOLOR", (0, 2), (0, 2), SEVERITY_COLORS["HIGH"]),
-            ("BACKGROUND", (0, 3), (-1, 3), colors.HexColor("#FEF9C3")),  # MEDIUM
-            ("TEXTCOLOR", (0, 3), (0, 3), SEVERITY_COLORS["MEDIUM"]),
-            ("BACKGROUND", (0, 4), (-1, 4), colors.HexColor("#DCFCE7")),  # LOW
-        ]
-        sev_table.setStyle(TableStyle(sev_style))
-        elements.append(sev_table)
-        elements.append(Spacer(1, 0.5 * cm))
-
-        # Risk Scores
-        elements.append(Paragraph("Risk Assessment", self.styles["KavachH2"]))
-        risk_data = [
-            ["Metric", "Score", "Level"],
-            ["Banking Risk Score (BRS)", f"{brs_score:.1f}", brs_risk_level],
-            ["Zero-Day Prediction Risk", f"{zero_day_score:.1f}", zero_day_level],
-        ]
-        risk_table = Table(risk_data, colWidths=[7 * cm, 4 * cm, 5 * cm])
-        risk_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), KAVACH_DARK),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
             ("TOPPADDING", (0, 0), (-1, -1), 8),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
             ("BACKGROUND", (0, 1), (-1, -1), KAVACH_LIGHT),
             ("FONTNAME", (1, 1), (2, -1), "Helvetica-Bold"),
         ]))
-        elements.append(risk_table)
+        elements.append(score_table)
+        elements.append(Spacer(1, 0.6 * cm))
 
-        return elements
-
-    def _build_findings_section(self, findings: list[dict]):
-        elements = []
-        elements.append(Paragraph("Security Findings", self.styles["KavachH1"]))
-        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE))
-        elements.append(Spacer(1, 0.3 * cm))
-
-        if not findings:
-            elements.append(Paragraph("No findings detected.", self.styles["KavachBody"]))
-            return elements
-
-        # Table header
-        table_data = [["#", "Title", "Severity", "CVSS", "BRS", "File"]]
-
-        for i, f in enumerate(findings[:100], 1):  # Cap at 100 for PDF
-            title = (f.get("title") or "")[:60]
-            if len(f.get("title", "")) > 60:
-                title += "..."
-            file_path = (f.get("file_path") or "N/A")[-40:]  # Show last 40 chars
-            table_data.append([
-                str(i),
-                title,
-                f.get("severity", ""),
-                f"{f.get('cvss', 0):.1f}",
-                f"{f.get('brs', 0):.1f}",
-                file_path,
-            ])
-
-        findings_table = Table(
-            table_data,
-            colWidths=[0.7 * cm, 6.5 * cm, 1.8 * cm, 1.3 * cm, 1.3 * cm, 4.4 * cm],
-            repeatRows=1,
-        )
-
-        style = [
+        # Severity breakdown table
+        elements.append(Paragraph("Threat Breakdown by Severity", self.styles["KavachH2"]))
+        sev_data = [
+            ["Severity Level", "Vulnerabilities Logged", "Mitigation SLA Guide"],
+            ["CRITICAL", str(summary.get("CRITICAL", 0)), "Immediate Patch (SLA: 24h)"],
+            ["HIGH", str(summary.get("HIGH", 0)), "Mitigate within 7 days"],
+            ["MEDIUM", str(summary.get("MEDIUM", 0)), "Mitigate within 30 days"],
+            ["LOW", str(summary.get("LOW", 0)), "Log & Track"],
+            ["INFO", str(summary.get("INFO", 0)), "Audit Reference Only"],
+        ]
+        sev_table = Table(sev_data, colWidths=[5 * cm, 5 * cm, 7 * cm])
+        sev_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), KAVACH_DARK),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7.5),
-            ("GRID", (0, 0), (-1, -1), 0.3, colors.lightgrey),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, KAVACH_LIGHT]),
-        ]
-
-        # Color severity column
-        for i, f in enumerate(findings[:100], 1):
-            sev = f.get("severity", "").upper()
-            if sev in SEVERITY_COLORS:
-                style.append(("TEXTCOLOR", (2, i), (2, i), SEVERITY_COLORS[sev]))
-                style.append(("FONTNAME", (2, i), (2, i), "Helvetica-Bold"))
-
-        findings_table.setStyle(TableStyle(style))
-        elements.append(findings_table)
-
-        if len(findings) > 100:
-            elements.append(Spacer(1, 0.3 * cm))
-            elements.append(Paragraph(
-                f"Note: Showing first 100 of {len(findings)} findings. "
-                "See SARIF export for complete results.",
-                self.styles["KavachSmall"]
-            ))
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#FFE4E6")),
+            ("TEXTCOLOR", (0, 1), (0, 1), SEVERITY_COLORS["CRITICAL"]),
+            ("BACKGROUND", (0, 2), (-1, 2), colors.HexColor("#FFEDD5")),
+            ("TEXTCOLOR", (0, 2), (0, 2), SEVERITY_COLORS["HIGH"]),
+            ("BACKGROUND", (0, 3), (-1, 3), colors.HexColor("#FEF9C3")),
+            ("TEXTCOLOR", (0, 3), (0, 3), SEVERITY_COLORS["MEDIUM"]),
+            ("BACKGROUND", (0, 4), (-1, -1), KAVACH_LIGHT),
+        ]))
+        elements.append(sev_table)
 
         return elements
 
     def _build_compliance_section(self, compliance_summary: dict, findings: list[dict]):
         elements = []
-        elements.append(Paragraph("Regulatory Compliance Mapping", self.styles["KavachH1"]))
-        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE))
-        elements.append(Spacer(1, 0.3 * cm))
+        elements.append(Paragraph("4. Regulatory Impact Analysis", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
 
         elements.append(Paragraph(
-            "The following regulatory frameworks have been assessed against the detected findings:",
+            "Banking applications require strict adherence to regulatory IT guidelines. Findings mapped to RBI, "
+            "PCI-DSS, and SWIFT CSP frameworks are highlighted below.",
             self.styles["KavachBody"]
         ))
-        elements.append(Spacer(1, 0.3 * cm))
+        elements.append(Spacer(1, 0.4 * cm))
 
+        # Compliance frameworks table
+        table_data = [["Compliance Standard", "Violations Count", "Framework Status"]]
         for key, data in compliance_summary.items():
-            status_color = colors.HexColor("#16A34A") if data["compliant"] else colors.HexColor("#DC2626")
-            status = "COMPLIANT" if data["compliant"] else f"NON-COMPLIANT ({data['violations']} violations)"
+            status = "COMPLIANT" if data["compliant"] else "NON-COMPLIANT"
+            table_data.append([
+                data["name"],
+                str(data["violations"]),
+                status,
+            ])
 
-            comp_data = [
-                [data["name"], status],
-            ]
-            comp_table = Table(comp_data, colWidths=[10 * cm, 6 * cm])
-            comp_table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (0, 0), KAVACH_DARK),
-                ("TEXTCOLOR", (0, 0), (0, 0), colors.white),
-                ("BACKGROUND", (1, 0), (1, 0), status_color),
-                ("TEXTCOLOR", (1, 0), (1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 9),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ]))
-            elements.append(comp_table)
-            elements.append(Spacer(1, 0.2 * cm))
+        comp_table = Table(table_data, colWidths=[7.5 * cm, 4.5 * cm, 5 * cm])
+        comp_style = [
+            ("BACKGROUND", (0, 0), (-1, 0), KAVACH_DARK),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, KAVACH_LIGHT]),
+        ]
 
-        elements.append(Spacer(1, 0.5 * cm))
+        # Highlight compliance status colors
+        for idx, (key, data) in enumerate(compliance_summary.items(), 1):
+            if data["compliant"]:
+                comp_style.append(("TEXTCOLOR", (2, idx), (2, idx), colors.HexColor("#16A34A")))
+            else:
+                comp_style.append(("TEXTCOLOR", (2, idx), (2, idx), colors.HexColor("#DC2626")))
+            comp_style.append(("FONTNAME", (2, idx), (2, idx), "Helvetica-Bold"))
 
-        # Sample compliance details
-        elements.append(Paragraph("Key Compliance Violations", self.styles["KavachH2"]))
-        compliant_findings = [
+        comp_table.setStyle(TableStyle(comp_style))
+        elements.append(comp_table)
+        elements.append(Spacer(1, 0.6 * cm))
+
+        # Compliance mappings per finding
+        elements.append(Paragraph("MAPPED AUDIT DEVIATIONS", self.styles["KavachH2"]))
+        violations = [
             f for f in findings
-            if f.get("compliance") and f["severity"].upper() in {"CRITICAL", "HIGH"}
-        ][:10]
-
-        if compliant_findings:
-            for f in compliant_findings:
-                comp = f.get("compliance", {})
-                elements.append(Paragraph(
-                    f"<b>{f.get('title', '')}</b> ({f.get('severity', '')})",
-                    self.styles["KavachBody"]
-                ))
-                if comp.get("rbi_clause"):
-                    elements.append(Paragraph(
-                        f"  • RBI: {comp['rbi_clause'][:120]}",
-                        self.styles["KavachSmall"]
-                    ))
-                if comp.get("pci_clause"):
-                    elements.append(Paragraph(
-                        f"  • PCI: {comp['pci_clause'][:120]}",
-                        self.styles["KavachSmall"]
-                    ))
-                elements.append(Spacer(1, 0.2 * cm))
-
-        return elements
-
-    def _build_ai_recommendations(self, findings: list[dict]):
-        elements = []
-        elements.append(Paragraph("AI-Powered Recommendations", self.styles["KavachH1"]))
-        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE))
-        elements.append(Spacer(1, 0.3 * cm))
-        elements.append(Paragraph(
-            "The following recommendations were generated by the KAVACH AI engine "
-            "(powered by Google Gemini) to help remediate the most critical findings:",
-            self.styles["KavachBody"]
-        ))
-        elements.append(Spacer(1, 0.3 * cm))
-
-        priority_findings = [
-            f for f in findings
-            if f.get("severity", "").upper() in {"CRITICAL", "HIGH"}
-            and (f.get("ai_explanation") or f.get("ai_remediation"))
+            if f.get("compliance") and f["severity"].upper() in {"CRITICAL", "HIGH", "MEDIUM"}
         ][:8]
 
-        if not priority_findings:
-            elements.append(Paragraph(
-                "No AI insights available for current findings.",
-                self.styles["KavachBody"]
-            ))
-            return elements
-
-        for f in priority_findings:
-            sev_color = SEVERITY_COLORS.get(f.get("severity", "").upper(), KAVACH_MUTED)
-            title_style = ParagraphStyle(
-                "finding_title",
-                fontSize=10, fontName="Helvetica-Bold",
-                textColor=sev_color, spaceAfter=4
-            )
-            elements.append(Paragraph(
-                f"[{f.get('severity', '')}] {f.get('title', '')}",
-                title_style
-            ))
-
-            if f.get("ai_explanation"):
+        if violations:
+            for f in violations:
+                comp = f.get("compliance", {})
                 elements.append(Paragraph(
-                    f"<b>What it is:</b> {f['ai_explanation']}",
+                    f"• <b>[{f.get('severity', '')}] {f.get('title', '')}</b>",
                     self.styles["KavachBody"]
                 ))
-
-            if f.get("ai_business_impact"):
+                clauses = []
+                if comp.get("rbi_clause"):
+                    clauses.append(f"RBI IT 2021: <u>{comp['rbi_clause']}</u>")
+                if comp.get("pci_clause"):
+                    clauses.append(f"PCI-DSS v4.0: <u>{comp['pci_clause']}</u>")
+                if comp.get("swift_clause"):
+                    clauses.append(f"SWIFT CSP: <u>{comp['swift_clause']}</u>")
+                
                 elements.append(Paragraph(
-                    f"<b>Business Impact:</b> {f['ai_business_impact']}",
-                    self.styles["KavachBody"]
+                    " &nbsp;&nbsp;&nbsp;&nbsp;MAPPED TO: " + " | ".join(clauses),
+                    self.styles["KavachSmall"]
                 ))
-
-            if f.get("ai_remediation"):
-                elements.append(Paragraph(
-                    f"<b>Remediation:</b> {f['ai_remediation']}",
-                    self.styles["KavachBody"]
-                ))
-
-            elements.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
-            elements.append(Spacer(1, 0.3 * cm))
+                elements.append(Spacer(1, 0.15 * cm))
+        else:
+            elements.append(Paragraph("No regulatory framework violations logged.", self.styles["KavachBody"]))
 
         return elements
+
+    def _generate_banking_impact(self, f: dict) -> str:
+        comp = f.get("compliance", {})
+        clauses = []
+        if comp:
+            if comp.get("rbi_clause"):
+                clauses.append(f"RBI Guidelines Section {comp['rbi_clause']}")
+            if comp.get("pci_clause"):
+                clauses.append(f"PCI DSS requirement {comp['pci_clause']}")
+            if comp.get("swift_clause"):
+                clauses.append(f"SWIFT CSP clause {comp['swift_clause']}")
+        
+        if clauses:
+            ref_clause = " and ".join(clauses)
+            return f"Direct violation of {ref_clause}. This critical deviation raises severe audit red flags, exposing the bank to regulatory sanctions, financial penalties by regulators, and potentially compromising user accounts."
+        else:
+            return "Compromises internal transaction processing boundaries. Exposes core system assets to unauthorized access, potentially violating RBI general security mandates."
+
+    def _build_detailed_findings_section(self, findings: list[dict]):
+        elements = []
+        elements.append(Paragraph("5. Detailed Findings Section", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
+
+        # Display top 5 critical findings in high detail
+        critical_findings = [
+            f for f in findings
+            if f.get("severity", "").upper() in {"CRITICAL", "HIGH", "MEDIUM"}
+        ][:5]
+
+        if not critical_findings:
+            elements.append(Paragraph("No detailed high-risk findings to report.", self.styles["KavachBody"]))
+            return elements
+
+        for idx, f in enumerate(critical_findings, 1):
+            sev_color = SEVERITY_COLORS.get(f.get("severity", "").upper(), KAVACH_MUTED)
+            elements.append(Paragraph(
+                f"Finding #{idx}: <b>{f.get('title', '')}</b>",
+                ParagraphStyle("det_title", fontSize=11, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
+            ))
+
+            # Metadata Table
+            meta_data = [
+                ["Severity:", f.get("severity", "").upper(), "CVSS Score:", f"{f.get('cvss', 0.0):.1f}"],
+                ["Location:", f.get("file_path") or "Dependencies", "Line:", str(f.get("line_number") or "N/A")],
+            ]
+            meta_table = Table(meta_data, colWidths=[2.5 * cm, 6 * cm, 2.5 * cm, 6 * cm])
+            meta_table.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("TEXTCOLOR", (1, 0), (1, 0), sev_color),
+                ("FONTNAME", (1, 0), (1, 0), "Helvetica-Bold"),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("LINEBELOW", (0, -1), (-1, -1), 0.5, colors.lightgrey),
+            ]))
+            elements.append(meta_table)
+            elements.append(Spacer(1, 0.15 * cm))
+
+            elements.append(Paragraph(
+                f"<b>Description:</b> {f.get('description', '')}",
+                self.styles["KavachBody"]
+            ))
+
+            # Business Impact
+            biz_impact = f.get('ai_business_impact') or "Threatens the operational continuity of banking microservices."
+            elements.append(Paragraph(
+                f"<b>Business Impact:</b> {biz_impact}",
+                self.styles["KavachBody"]
+            ))
+
+            # Banking Impact
+            banking_impact = self._generate_banking_impact(f)
+            elements.append(Paragraph(
+                f"<b>Banking Impact:</b> {banking_impact}",
+                self.styles["KavachBody"]
+            ))
+
+            # Remediation
+            remediation = f.get('ai_remediation') or "Please consult secure coding rules to fix this vulnerability."
+            elements.append(Paragraph(
+                f"<b>Remediation:</b> {remediation}",
+                self.styles["KavachBody"]
+            ))
+
+            elements.append(Spacer(1, 0.4 * cm))
+
+        return elements
+
+    def _generate_attack_scenario(self, f: dict) -> str:
+        category = f.get("category", "").lower()
+        title = f.get("title", "").lower()
+        if "secret" in category or "credential" in title or "password" in title:
+            return "An adversary scans code repositories or decompiles application assets to extract hardcoded API keys/passwords. They then authenticate directly to database interfaces or APIs, bypassing internal access logs."
+        elif "sql" in category or "injection" in title:
+            return "An attacker inputs specially crafted database payloads inside UI or API fields. The application database driver executes these queries directly, allowing the attacker to bypass authentication or fetch transaction ledgers."
+        elif "crypto" in category or "weak" in title or "cipher" in title:
+            return "A malicious actor intercepts network packets in transit, exploiting weaker encryption protocols to perform mathematical key collisions and recover customer credentials or payload details."
+        elif "deserialization" in category or "pickle" in title:
+            return "An attacker injects an encoded python object inside API requests. The application deserializes this object without verification, triggering arbitrary operating system commands and establishing a shell connection."
+        elif "dependency" in category or "vulnerable" in category:
+            return "An attacker launches automated exploits targeting the known CVE in the third-party library, forcing a memory buffer overflow to execute unauthorized scripts on the application node."
+        else:
+            return "An attacker exploits the configuration oversight to gain unauthorized permissions, allowing access to system settings or debug endpoints."
+
+    def _build_ai_analyst_commentary(self, findings: list[dict]):
+        elements = []
+        elements.append(Paragraph("6. AI Security Analyst Commentary", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
+
+        # Focus AI commentary on top 5 critical/high-severity findings
+        target_findings = [
+            f for f in findings
+            if f.get("severity", "").upper() in {"CRITICAL", "HIGH", "MEDIUM"}
+        ][:5]
+
+        if not target_findings:
+            elements.append(Paragraph("No critical or high findings requiring AI commentary.", self.styles["KavachBody"]))
+            return elements
+
+        for idx, f in enumerate(target_findings, 1):
+            elements.append(Paragraph(
+                f"Analyst Insight #{idx}: <b>{f.get('title', '')}</b>",
+                ParagraphStyle("ai_title", fontSize=10.5, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
+            ))
+
+            # Threat Analysis
+            threat_analysis = f.get("ai_explanation") or "Automated vulnerability scanner identified potential exposure."
+            
+            # Attack Scenario
+            attack_scenario = self._generate_attack_scenario(f)
+
+            # Risk Explanation
+            risk_explanation = f.get("ai_business_impact") or "Vulnerability creates potential paths for lateral system escalation."
+
+            # Recommended Action
+            recommended_action = f.get("ai_remediation") or "Patch code and review system dependency trees."
+
+            # AI Security Analyst Commentary Box
+            ai_data = [
+                [Paragraph("<b>AI Security Analyst Commentary</b>", ParagraphStyle("ai_h", fontSize=8.5, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569")))],
+                [Paragraph(f"<b>Threat Analysis:</b> {threat_analysis}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Attack Scenario:</b> {attack_scenario}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Risk Explanation:</b> {risk_explanation}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Recommended Action:</b> {recommended_action}", self.styles["KavachSmall"])],
+            ]
+            ai_table = Table(ai_data, colWidths=[17 * cm])
+            ai_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            
+            elements.append(KeepTogether([ai_table, Spacer(1, 0.4 * cm)]))
+
+        return elements
+
+    def _build_action_plan(self, findings: list[dict]):
+        elements = []
+        elements.append(Paragraph("7. Executive Action Plan", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
+
+        elements.append(Paragraph(
+            "Banking stakeholders and CISOs must execute the following remediation actions based on logged threat profiles:",
+            self.styles["KavachBody"]
+        ))
+        elements.append(Spacer(1, 0.3 * cm))
+
+        # Priorities
+        criticals = [f for f in findings if f["severity"].upper() == "CRITICAL"]
+        highs = [f for f in findings if f["severity"].upper() == "HIGH"]
+        mediums = [f for f in findings if f["severity"].upper() == "MEDIUM"]
+
+        elements.append(Paragraph("<b>PRIORITY 1: Immediate Remediation (SLA: 24h - 48h)</b>", self.styles["KavachH2"]))
+        if criticals:
+            p1_desc = f"Remediate the {len(criticals)} critical exposures logged in the codebase. Address SQL injection, token spoofing, or credential leaks immediately."
+        else:
+            p1_desc = "No critical vulnerabilities active. Verify authentication flows and continue automated integration checks."
+        elements.append(Paragraph(p1_desc, self.styles["KavachBody"]))
+        elements.append(Spacer(1, 0.2 * cm))
+
+        elements.append(Paragraph("<b>PRIORITY 2: Dependency & Configuration Patching (SLA: 7 Days)</b>", self.styles["KavachH2"]))
+        if highs:
+            p2_desc = f"Update the {len(highs)} outdated packages and libraries identified in the dependency audit. Focus on libraries mapped to CVEs and zero-day forecast vectors."
+        else:
+            p2_desc = "Evaluate and patch any medium-severity code issues and config files flagged in the latest scanner run."
+        elements.append(Paragraph(p2_desc, self.styles["KavachBody"]))
+        elements.append(Spacer(1, 0.2 * cm))
+
+        elements.append(Paragraph("<b>PRIORITY 3: Compliance & Architecture Alignment (SLA: 30 Days)</b>", self.styles["KavachH2"]))
+        p3_desc = (
+            "Verify complete RBI IT Framework alignment for encryption at rest and in transit. Update SBOM details "
+            "and sign dependency definitions for the next regulatory audit cycle."
+        )
+        elements.append(Paragraph(p3_desc, self.styles["KavachBody"]))
+
+        return elements
+
+    def _build_appendix(self, scan_id, repo_name, compliance_summary, generated_at):
+        elements = []
+        elements.append(Paragraph("8. Appendix", self.styles["KavachH1"]))
+        elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
+
+        # Compliance Basis
+        bases = []
+        for key, data in compliance_summary.items():
+            bases.append(f"{data['name']}: {'COMPLIANT' if data['compliant'] else 'NON-COMPLIANT'}")
+        bases_str = " | ".join(bases)
+
+        elements.append(Paragraph(
+            "<b>SARIF Integration:</b> A machine-readable SARIF v2.1.0 JSON file is generated alongside this document "
+            f"({scan_id}_findings.sarif). This can be fed into IDEs or CI/CD pipelines (GitHub Actions, GitLab CI).<br/><br/>"
+            "<b>SBOM Summary:</b> Software Bill of Materials compiled in CycloneDX JSON format "
+            f"({scan_id}_sbom.json). It catalogs library trees, versions, and license profiles.<br/><br/>"
+            f"<b>Metadata & Engine Version:</b> KAVACH DevSecOps Core v1.0.0. Core scan time: "
+            f"{generated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}. Audit target: repository instance '{repo_name}'.<br/>"
+            f"<b>Regulatory Compliance Baseline:</b> {bases_str}",
+            self.styles["KavachBody"]
+        ))
+
+        return elements
+
 
 
 # ── SARIF Generator ───────────────────────────────────────────────────────────

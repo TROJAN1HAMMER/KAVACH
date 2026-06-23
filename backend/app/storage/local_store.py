@@ -63,7 +63,10 @@ def _write_json(file_path: Path, data: dict):
 
 def save_scan(scan_data: dict):
     """Create or update a scan record."""
-    scan_id = str(scan_data["id"])
+    # Support both scan_id and legacy id when saving
+    if "id" in scan_data and "scan_id" not in scan_data:
+        scan_data["scan_id"] = scan_data.pop("id")
+    scan_id = str(scan_data["scan_id"])
     data = _read_json(SCANS_FILE)
     data[scan_id] = scan_data
     _write_json(SCANS_FILE, data)
@@ -72,13 +75,23 @@ def save_scan(scan_data: dict):
 def get_scan(scan_id: str) -> dict | None:
     """Retrieve a scan by ID."""
     data = _read_json(SCANS_FILE)
-    return data.get(str(scan_id))
+    scan = data.get(str(scan_id))
+    if scan:
+        # Convert legacy id to scan_id during load
+        if "id" in scan and "scan_id" not in scan:
+            scan["scan_id"] = scan.pop("id")
+    return scan
 
 
 def get_all_scans() -> list[dict]:
     """Retrieve all scans."""
     data = _read_json(SCANS_FILE)
-    return list(data.values())
+    scans = list(data.values())
+    for scan in scans:
+        # Convert legacy id to scan_id during load
+        if "id" in scan and "scan_id" not in scan:
+            scan["scan_id"] = scan.pop("id")
+    return scans
 
 
 # ── Findings Operations ──────────────────────────────────────────────────────

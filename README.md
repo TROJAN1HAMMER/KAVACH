@@ -31,7 +31,7 @@ Navigate to the backend directory and install dependencies:
 ```bash
 cd backend
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activatef
 pip install -r requirements.txt
 ```
 

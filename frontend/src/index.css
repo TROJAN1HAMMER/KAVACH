@@ -3,26 +3,26 @@
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 
-  --color-background: #0B0F19; /* Deep sleek dark blue/black */
-  --color-foreground: #F8FAFC;
-  --color-card: rgba(15, 23, 42, 0.6); /* Translucent slate-900 */
+  --color-background: #05070B; /* Palantir-style deep charcoal */
+  --color-foreground: #E2E8F0;
+  --color-card: #0A0E17; /* High contrast matte slate */
   --color-card-foreground: #F8FAFC;
-  --color-border: rgba(51, 65, 85, 0.5); /* Semi-transparent slate-700 */
+  --color-border: #151D2A; /* Clean thin slate border */
   
-  --color-primary: #3B82F6;
-  --color-primary-foreground: #FFFFFF;
-  --color-secondary: #1E293B;
-  --color-secondary-foreground: #F8FAFC;
+  --color-primary: #00F0FF; /* High-intensity Cyber Cyan */
+  --color-primary-foreground: #020617;
+  --color-secondary: #0F172A;
+  --color-secondary-foreground: #E2E8F0;
   
-  --color-muted: #1E293B;
-  --color-muted-foreground: #94A3B8;
+  --color-muted: #0F172A;
+  --color-muted-foreground: #64748B;
   
-  --color-accent: #8B5CF6;
-  --color-accent-foreground: #FFFFFF;
+  --color-accent: #38BDF8; /* Sky blue secondary accent */
+  --color-accent-foreground: #020617;
   
-  --color-danger: #EF4444;
-  --color-warning: #F59E0B;
-  --color-success: #10B981;
+  --color-danger: #F43F5E; /* Rose red */
+  --color-warning: #F59E0B; /* Amber */
+  --color-success: #10B981; /* Emerald */
 }
 
 @layer base {
@@ -31,9 +31,11 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
-    /* Premium subtle radial gradient background */
-    background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-                      radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 50%);
+    /* Subtle central cyber cyan glow + structured layout grids */
+    background-image: radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.05) 0%, transparent 60%),
+                      linear-gradient(to right, rgba(21, 29, 42, 0.4) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(21, 29, 42, 0.4) 1px, transparent 1px);
+    background-size: 100% 100%, 36px 36px, 36px 36px;
     background-attachment: fixed;
     min-height: 100vh;
   }
@@ -59,19 +61,78 @@
     transform: translateY(-2px);
   }
 
+  .premium-glow-border {
+    position: relative;
+  }
+
+  .premium-glow-border::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    z-index: -1;
+    border-radius: inherit;
+    opacity: 0.15;
+    transition: opacity 0.3s;
+  }
+
+  .premium-glow-border:hover::after {
+    opacity: 0.4;
+  }
+
+  /* Scan line sweep effect */
+  .scan-sweep-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scan-sweep-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(59, 130, 246, 0.05) 50%,
+      rgba(59, 130, 246, 0.15) 99%,
+      var(--color-primary) 100%
+    );
+    animation: scan-sweep 3s infinite linear;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  @keyframes scan-sweep {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(200%); }
+  }
+
+  /* Slow rotation animation */
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .animate-spin-slow {
+    animation: spin-slow 12s infinite linear;
+  }
+
   /* Custom scrollbar for modern look */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: rgba(15, 23, 42, 0.5);
+    background: rgba(15, 23, 42, 0.3);
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(51, 65, 85, 0.8);
+    background: rgba(51, 65, 85, 0.5);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(71, 85, 105, 1);
+    background: rgba(59, 130, 246, 0.7);
   }
 }

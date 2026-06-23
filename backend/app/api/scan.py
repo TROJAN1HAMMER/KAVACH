@@ -6,6 +6,7 @@ Handles uploading repositories and retrieving scan findings.
 import uuid
 from pathlib import Path
 from typing import Annotated
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
 
@@ -35,10 +36,17 @@ async def upload_repo(
     repo_name = file.filename.replace(".zip", "")
     
     scan_data = {
-        "id": scan_id,
+        "scan_id": scan_id,
         "repo_name": repo_name,
         "status": "pending",
         "total_findings": 0,
+        "brs_score": None,
+        "brs_risk_level": None,
+        "zero_day_risk_score": None,
+        "zero_day_risk_level": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "completed_at": None,
+        "error_message": None,
     }
     local_store.save_scan(scan_data)
 
@@ -67,7 +75,8 @@ async def get_scan_status(scan_id: uuid.UUID):
     scan = local_store.get_scan(str(scan_id))
     if not scan:
         raise HTTPException(status_code=404, detail="Scan not found")
-    return scan
+    
+    return ScanStatusResponse(**scan)
 
 
 @router.get("/findings/{scan_id}", response_model=FindingsListResponse)
@@ -82,7 +91,7 @@ async def get_scan_findings(scan_id: uuid.UUID):
     findings = local_store.get_findings(str(scan_id))
 
     return FindingsListResponse(
-        scan_id=scan["id"],
+        scan_id=scan["scan_id"],
         total=len(findings),
         findings=findings
     )

@@ -1,0 +1,138 @@
+{
+  "4459427d-8f96-453c-87e1-3de7a9fc459e": [
+    {
+      "scan_id": "4459427d-8f96-453c-87e1-3de7a9fc459e",
+      "report_type": "pdf",
+      "file_path": "reports/4459427d-8f96-453c-87e1-3de7a9fc459e_report.pdf"
+    },
+    {
+      "scan_id": "4459427d-8f96-453c-87e1-3de7a9fc459e",
+      "report_type": "sarif",
+      "file_path": "reports/4459427d-8f96-453c-87e1-3de7a9fc459e_findings.sarif"
+    },
+    {
+      "scan_id": "4459427d-8f96-453c-87e1-3de7a9fc459e",
+      "report_type": "sbom",
+      "file_path": "reports/4459427d-8f96-453c-87e1-3de7a9fc459e_sbom.json"
+    }
+  ],
+  "07e069ff-abab-4f8d-b6f8-62f61ea4dd3f": [
+    {
+      "scan_id": "07e069ff-abab-4f8d-b6f8-62f61ea4dd3f",
+      "report_type": "pdf",
+      "file_path": "reports/07e069ff-abab-4f8d-b6f8-62f61ea4dd3f_report.pdf"
+    },
+    {
+      "scan_id": "07e069ff-abab-4f8d-b6f8-62f61ea4dd3f",
+      "report_type": "sarif",
+      "file_path": "reports/07e069ff-abab-4f8d-b6f8-62f61ea4dd3f_findings.sarif"
+    },
+    {
+      "scan_id": "07e069ff-abab-4f8d-b6f8-62f61ea4dd3f",
+      "report_type": "sbom",
+      "file_path": "reports/07e069ff-abab-4f8d-b6f8-62f61ea4dd3f_sbom.json"
+    }
+  ],
+  "569eb33d-7bdf-4d0c-ae48-15472410c0a6": [
+    {
+      "scan_id": "569eb33d-7bdf-4d0c-ae48-15472410c0a6",
+      "report_type": "pdf",
+      "file_path": "reports/569eb33d-7bdf-4d0c-ae48-15472410c0a6_report.pdf"
+    },
+    {
+      "scan_id": "569eb33d-7bdf-4d0c-ae48-15472410c0a6",
+      "report_type": "sarif",
+      "file_path": "reports/569eb33d-7bdf-4d0c-ae48-15472410c0a6_findings.sarif"
+    },
+    {
+      "scan_id": "569eb33d-7bdf-4d0c-ae48-15472410c0a6",
+      "report_type": "sbom",
+      "file_path": "reports/569eb33d-7bdf-4d0c-ae48-15472410c0a6_sbom.json"
+    }
+  ],
+  "a5b10226-f4f2-42c3-baae-d774147a5812": [
+    {
+      "scan_id": "a5b10226-f4f2-42c3-baae-d774147a5812",
+      "report_type": "pdf",
+      "file_path": "reports/a5b10226-f4f2-42c3-baae-d774147a5812_report.pdf"
+    },
+    {
+      "scan_id": "a5b10226-f4f2-42c3-baae-d774147a5812",
+      "report_type": "sarif",
+      "file_path": "reports/a5b10226-f4f2-42c3-baae-d774147a5812_findings.sarif"
+    },
+    {
+      "scan_id": "a5b10226-f4f2-42c3-baae-d774147a5812",
+      "report_type": "sbom",
+      "file_path": "reports/a5b10226-f4f2-42c3-baae-d774147a5812_sbom.json"
+    }
+  ],
+  "1052c1a1-935e-42e2-a08f-756dfec4777c": [
+    {
+      "scan_id": "1052c1a1-935e-42e2-a08f-756dfec4777c",
+      "report_type": "pdf",
+      "file_path": "reports/1052c1a1-935e-42e2-a08f-756dfec4777c_report.pdf"
+    },
+    {
+      "scan_id": "1052c1a1-935e-42e2-a08f-756dfec4777c",
+      "report_type": "sarif",
+      "file_path": "reports/1052c1a1-935e-42e2-a08f-756dfec4777c_findings.sarif"
+    },
+    {
+      "scan_id": "1052c1a1-935e-42e2-a08f-756dfec4777c",
+      "report_type": "sbom",
+      "file_path": "reports/1052c1a1-935e-42e2-a08f-756dfec4777c_sbom.json"
+    }
+  ],
+  "99d2b0cd-d666-4845-9836-8737c6426743": [
+    {
+      "scan_id": "99d2b0cd-d666-4845-9836-8737c6426743",
+      "report_type": "pdf",
+      "file_path": "reports/99d2b0cd-d666-4845-9836-8737c6426743_report.pdf"
+    },
+    {
+      "scan_id": "99d2b0cd-d666-4845-9836-8737c6426743",
+      "report_type": "sarif",
+      "file_path": "reports/99d2b0cd-d666-4845-9836-8737c6426743_findings.sarif"
+    },
+    {
+      "scan_id": "99d2b0cd-d666-4845-9836-8737c6426743",
+      "report_type": "sbom",
+      "file_path": "reports/99d2b0cd-d666-4845-9836-8737c6426743_sbom.json"
+    }
+  ],
+  "5ec44b7c-9be2-4834-9f59-b014c8307522": [
+    {
+      "scan_id": "5ec44b7c-9be2-4834-9f59-b014c8307522",
+      "report_type": "pdf",
+      "file_path": "reports/5ec44b7c-9be2-4834-9f59-b014c8307522_report.pdf"
+    },
+    {
+      "scan_id": "5ec44b7c-9be2-4834-9f59-b014c8307522",
+      "report_type": "sarif",
+      "file_path": "reports/5ec44b7c-9be2-4834-9f59-b014c8307522_findings.sarif"
+    },
+    {
+      "scan_id": "5ec44b7c-9be2-4834-9f59-b014c8307522",
+      "report_type": "sbom",
+      "file_path": "reports/5ec44b7c-9be2-4834-9f59-b014c8307522_sbom.json"
+    }
+  ],
+  "469e9d08-365b-446b-bbfd-f7e4804dca15": [
+    {
+      "scan_id": "469e9d08-365b-446b-bbfd-f7e4804dca15",
+      "report_type": "pdf",
+      "file_path": "reports/469e9d08-365b-446b-bbfd-f7e4804dca15_report.pdf"
+    },
+    {
+      "scan_id": "469e9d08-365b-446b-bbfd-f7e4804dca15",
+      "report_type": "sarif",
+      "file_path": "reports/469e9d08-365b-446b-bbfd-f7e4804dca15_findings.sarif"
+    },
+    {
+      "scan_id": "469e9d08-365b-446b-bbfd-f7e4804dca15",
+      "report_type": "sbom",
+      "file_path": "reports/469e9d08-365b-446b-bbfd-f7e4804dca15_sbom.json"
+    }
+  ]
+}

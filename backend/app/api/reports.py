@@ -29,7 +29,7 @@ async def get_report_status(scan_id: uuid.UUID):
     types = [r["report_type"] for r in reports]
     
     return ReportPathsResponse(
-        scan_id=scan["id"],
+        scan_id=scan["scan_id"],
         pdf_available="pdf" in types,
         sarif_available="sarif" in types,
         sbom_available="sbom" in types
