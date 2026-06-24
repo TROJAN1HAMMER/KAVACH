@@ -87,9 +87,8 @@ async def health_check() -> dict:
     """Platform health check endpoint."""
     return {
         "status": "healthy",
-        "platform": "KAVACH",
-        "version": settings.app_version,
-        "environment": settings.app_env,
+        "storage": "ready",
+        "reports": "ready"
     }
 
 

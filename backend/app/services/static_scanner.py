@@ -318,7 +318,7 @@ def run_static_scan(repo_path: Union[str, Path]) -> list[RawFinding]:
         )
 
         logger.info(
-            "static_scanner.semgrep_complete",
+            "[SEMGREP] static_scanner.semgrep_complete",
             returncode=result.returncode,
             stderr_preview=result.stderr[:200] if result.stderr else "",
         )
@@ -330,7 +330,7 @@ def run_static_scan(repo_path: Union[str, Path]) -> list[RawFinding]:
             return _fallback_pattern_scan(repo_path)
 
         findings = _parse_semgrep_output(semgrep_output, repo_path)
-        logger.info("static_scanner.findings", count=len(findings))
+        logger.info("[SEMGREP] static_scanner.findings", count=len(findings))
         return findings
 
     except FileNotFoundError:

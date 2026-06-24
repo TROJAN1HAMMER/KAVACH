@@ -239,7 +239,7 @@ def _generate_sbom(req_file: Path, output_path: Path) -> Optional[dict]:
 
         if output_path.exists():
             sbom_data = json.loads(output_path.read_text(encoding="utf-8"))
-            logger.info("dependency_scanner.sbom.generated", path=str(output_path))
+            logger.info("[SBOM] dependency_scanner.sbom.generated", path=str(output_path))
             return sbom_data
         else:
             logger.warning("dependency_scanner.sbom.output_not_found", stderr=result.stderr[:300])
@@ -341,11 +341,11 @@ def run_dependency_scan(
     # ── Run pip-audit ──
     all_raw: list[dict[str, Any]] = []
     for req_file in req_files:
-        logger.info("dependency_scanner.scanning", file=str(req_file))
+        logger.info("[PIP-AUDIT] dependency_scanner.scanning", file=str(req_file))
         all_raw.extend(_run_pip_audit(req_file))
 
     findings = _parse_pip_audit_results(all_raw)
-    logger.info("dependency_scanner.findings", count=len(findings))
+    logger.info("[PIP-AUDIT] dependency_scanner.findings", count=len(findings))
 
     # ── Generate SBOM using first req file found ──
     sbom_output_path = reports_dir / f"{scan_id}_sbom.json"
@@ -357,6 +357,6 @@ def run_dependency_scan(
 
     # Always write SBOM to disk
     sbom_output_path.write_text(json.dumps(sbom, indent=2), encoding="utf-8")
-    logger.info("dependency_scanner.sbom.saved", path=str(sbom_output_path))
+    logger.info("[SBOM] dependency_scanner.sbom.saved", path=str(sbom_output_path))
 
     return findings, sbom

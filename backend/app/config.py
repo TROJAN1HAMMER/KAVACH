@@ -43,6 +43,7 @@ class Settings(BaseSettings):
         """Create required directories if they do not exist."""
         os.makedirs(self.upload_dir, exist_ok=True)
         os.makedirs(self.reports_dir, exist_ok=True)
+        os.makedirs(self.data_dir, exist_ok=True)
 
 
 @lru_cache

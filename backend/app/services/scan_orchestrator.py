@@ -42,7 +42,7 @@ async def execute_scan(scan_id: str, zip_file_path: Path):
     """
     Execute the entire DevSecOps pipeline locally.
     """
-    logger.info("scan_orchestrator.started", scan_id=scan_id)
+    logger.info("[SCAN] scan_orchestrator.started", scan_id=scan_id)
 
     # 1. Update status to running
     scan = local_store.get_scan(scan_id)
@@ -158,7 +158,7 @@ async def execute_scan(scan_id: str, zip_file_path: Path):
         scan["completed_at"] = datetime.now(timezone.utc).isoformat()
         local_store.save_scan(scan)
 
-        logger.info("scan_orchestrator.pipeline_complete", scan_id=scan_id)
+        logger.info("[SCAN] scan_orchestrator.pipeline_complete", scan_id=scan_id)
 
     except Exception as exc:
         logger.exception("scan_orchestrator.pipeline_failed", scan_id=scan_id, error=str(exc))

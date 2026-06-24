@@ -217,7 +217,7 @@ class KavachPDFReport:
         story.extend(self._build_appendix(scan_id, repo_name, compliance_summary, generated_at))
 
         doc.build(story)
-        logger.info("report_generator.pdf.generated", path=str(self.output_path))
+        logger.info("[REPORT] report_generator.pdf.generated", path=str(self.output_path))
         return self.output_path
 
     def _build_cover(self, scan_id, repo_name, brs_score, brs_risk_level, generated_at):
