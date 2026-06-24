@@ -51,8 +51,8 @@ class AIInsight:
 # ── Gemini Client ─────────────────────────────────────────────────────────────
 
 def _get_gemini_model():
-    """Initialize Gemini model. Returns None if API key not configured."""
-    if not settings.gemini_api_key:
+    """Initialize Gemini model. Returns None if API key not configured or is placeholder."""
+    if not settings.gemini_api_key or "your-gemini" in settings.gemini_api_key.lower():
         logger.warning("ai_engine.gemini_key_not_set — using template fallback")
         return None
     try:
@@ -292,7 +292,7 @@ def _cache_key(finding: RawFinding) -> str:
     retry=retry_if_exception_type(Exception),
     reraise=False,
 )
-def _call_gemini(model, prompt: str) -> str | None:
+def _call_gemini(model, prompt: str) -> Optional[str]:
     """Call Gemini API with retry logic."""
     response = model.generate_content(prompt)
     return response.text

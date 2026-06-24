@@ -19,7 +19,7 @@ import json
 import subprocess
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 import structlog
 
 from app.schemas.finding import RawFinding
@@ -288,7 +288,7 @@ def _parse_semgrep_output(semgrep_output: dict[str, Any], repo_path: Path) -> li
     return findings
 
 
-def run_static_scan(repo_path: str | Path) -> list[RawFinding]:
+def run_static_scan(repo_path: Union[str, Path]) -> list[RawFinding]:
     """
     Execute Semgrep on the given repository path.
 

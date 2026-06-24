@@ -1,12 +1,45 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, FileArchive, Loader2, Code, Cpu, BookOpen, Activity, TrendingUp, Network, Terminal } from 'lucide-react';
+import { Upload, FileArchive, Loader2, Code, Cpu, BookOpen, Activity, TrendingUp, Network, Terminal, Shield, AlertTriangle, ShieldAlert, Play } from 'lucide-react';
 import { api } from '../lib/api';
 import { cn } from '../lib/utils';
 
 interface UploadSectionProps {
   onUploadSuccess: (data: any) => void;
 }
+
+const PREMADE_PAYLOADS = [
+  {
+    level: "low" as const,
+    title: "Low Risk Sandbox",
+    description: "Standard production API deployment with fully updated libraries, parameterized database access, and strictly enforced TLS/SSL context configurations.",
+    scoreEst: "< 15 BRS",
+    vulns: ["Secure API Parameters", "Pydantic Schema Validation", "Hardened TLS 1.3 Config"],
+    color: "from-emerald-500/10 to-teal-500/10 border-emerald-500/20 hover:border-emerald-500/40 text-emerald-400",
+    badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    icon: Shield
+  },
+  {
+    level: "medium" as const,
+    title: "Medium Risk Sandbox",
+    description: "Semi-secure banking interface utilizing legacy hash functions, non-cryptographic random generation, minor path traversal vulnerabilities, and exposed server ports.",
+    scoreEst: "15 - 45 BRS",
+    vulns: ["SHA-1 Signature Hash", "Standard Insecure random()", "Dockerfile EXPOSE 3306"],
+    color: "from-amber-500/10 to-orange-500/10 border-amber-500/20 hover:border-amber-500/40 text-amber-400",
+    badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    icon: AlertTriangle
+  },
+  {
+    level: "high" as const,
+    title: "High Risk Sandbox",
+    description: "Critical vulnerability environment containing hardcoded AWS secret keys, database credentials, SQL injection execution paths, and outdated dependencies.",
+    scoreEst: "> 45 BRS",
+    vulns: ["Hardcoded AWS Keys", "Raw SQL string concatenation", "Unsafe yaml.load() / pickle"],
+    color: "from-rose-500/10 to-red-500/10 border-rose-500/20 hover:border-rose-500/40 text-rose-400",
+    badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    icon: ShieldAlert
+  }
+];
 
 const NODES = [
   { 
@@ -246,6 +279,19 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
     } catch (err: any) {
       console.error(err);
       setError(err.response?.data?.detail || "An error occurred during upload. Please ensure the backend is running.");
+      setIsUploading(false);
+    }
+  };
+
+  const handlePremadeScan = async (riskLevel: 'low' | 'medium' | 'high') => {
+    setError(null);
+    setIsUploading(true);
+    try {
+      const data = await api.startPremadeScan(riskLevel);
+      onUploadSuccess(data);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.response?.data?.detail || `An error occurred while launching premade ${riskLevel} risk scan. Please ensure the backend is running.`);
       setIsUploading(false);
     }
   };
@@ -546,6 +592,79 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
               <span className="w-1.5 h-1.5 rounded-full bg-success animate-ping" /> SECURED
             </span>
           </div>
+        </div>
+      </div>
+
+      {/* Pre-made Sandbox Payloads Section */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <Cpu className="w-4 h-4 text-primary animate-pulse" /> Pre-made Sandbox Payloads
+          </h3>
+          <p className="text-[9px] text-muted-foreground uppercase mt-0.5 font-sans">
+            Ready-made templates targeting different security risk classes. Select to trigger a sandbox assessment instantly.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {PREMADE_PAYLOADS.map((payload, idx) => {
+            const Icon = payload.icon;
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  "bg-gradient-to-br border rounded-md p-5 flex flex-col justify-between min-h-[220px] transition-all duration-300 relative group overflow-hidden shadow-lg",
+                  payload.color
+                )}
+              >
+                {/* Background ambient glow matching risk level */}
+                <div className="absolute -right-10 -bottom-10 w-24 h-24 rounded-full bg-current opacity-[0.03] blur-xl pointer-events-none group-hover:scale-150 transition-all duration-500" />
+
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="w-8 h-8 rounded bg-slate-900/80 border border-white/5 flex items-center justify-center">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-sm border text-[7.5px] font-black uppercase tracking-wider",
+                      payload.badgeColor
+                    )}>
+                      {payload.scoreEst}
+                    </span>
+                  </div>
+
+                  <h4 className="text-[10px] font-extrabold text-white uppercase tracking-wider mb-2">
+                    {payload.title}
+                  </h4>
+                  <p className="text-[8.5px] text-slate-400 leading-relaxed font-sans mb-4">
+                    {payload.description}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="border-t border-white/5 pt-3 mb-4 flex flex-col gap-1.5">
+                    <span className="text-[7.5px] text-muted-foreground uppercase font-black tracking-widest">Target Vectors:</span>
+                    <div className="flex flex-col gap-1">
+                      {payload.vulns.map((vuln, vIdx) => (
+                        <div key={vIdx} className="flex items-center gap-1.5 text-[7.5px] text-slate-300">
+                          <span className="w-1 h-1 rounded-full bg-current" />
+                          <span className="font-mono">{vuln}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => !isUploading && handlePremadeScan(payload.level)}
+                    disabled={isUploading}
+                    className="w-full flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 px-3 py-2 rounded text-[8px] font-black uppercase tracking-widest transition-all duration-200"
+                  >
+                    <Play className="w-2.5 h-2.5 fill-current" /> Trigger Assessment
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

@@ -40,14 +40,17 @@ def _load_mappings() -> dict:
 _COMPLIANCE_MAPPINGS: dict = _load_mappings()
 
 
+from typing import Optional
+
+
 # ── Data Classes ──────────────────────────────────────────────────────────────
 
 @dataclass
 class ComplianceMappingData:
-    rbi_clause: str | None
-    pci_clause: str | None
-    swift_clause: str | None
-    notes: str | None = None
+    rbi_clause: Optional[str]
+    pci_clause: Optional[str]
+    swift_clause: Optional[str]
+    notes: Optional[str] = None
 
 
 # ── Mapper ─────────────────────────────────────────────────────────────────────

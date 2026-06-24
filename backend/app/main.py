@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI):
     init_store()
     logger.info("kavach.storage.ready")
     
+    # Generate pre-made sandbox payloads
+    from app.utils.payload_generator import generate_premade_payloads
+    from pathlib import Path
+    generate_premade_payloads(Path(settings.data_dir))
+    logger.info("kavach.premade_payloads.ready")
+    
     yield
     logger.info("kavach.shutdown")
 

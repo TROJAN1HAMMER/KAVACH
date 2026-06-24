@@ -72,7 +72,10 @@ def save_scan(scan_data: dict):
     _write_json(SCANS_FILE, data)
 
 
-def get_scan(scan_id: str) -> dict | None:
+from typing import Optional
+
+
+def get_scan(scan_id: str) -> Optional[dict]:
     """Retrieve a scan by ID."""
     data = _read_json(SCANS_FILE)
     scan = data.get(str(scan_id))

@@ -20,7 +20,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 import structlog
 
 try:
@@ -224,7 +224,7 @@ SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", "di
 SKIP_FILES = {"package-lock.json", "yarn.lock", "poetry.lock", "Pipfile.lock"}
 
 
-def _classify_file(file_path: Path) -> str | None:
+def _classify_file(file_path: Path) -> Optional[str]:
     """Return the config file type or None if not a config file."""
     name = file_path.name
     suffix = file_path.suffix.lower()
@@ -294,7 +294,7 @@ def _scan_file(file_path: Path, repo_path: Path) -> list[RawFinding]:
 
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
-def run_config_scan(repo_path: str | Path) -> list[RawFinding]:
+def run_config_scan(repo_path: Union[str, Path]) -> list[RawFinding]:
     """
     Scan all configuration files in the repository for security misconfigurations.
 

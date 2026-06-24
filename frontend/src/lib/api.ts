@@ -41,6 +41,12 @@ export const api = {
     return response.data;
   },
   
+  // Trigger a scan using a pre-made sandbox payload (low, medium, high)
+  startPremadeScan: async (riskLevel: 'low' | 'medium' | 'high') => {
+    const response = await apiClient.post(`/scan/premade/${riskLevel}`);
+    return response.data;
+  },
+
   // URL generators for report downloads
   getReportDownloadUrl: (scanId: string, type: 'pdf' | 'sarif' | 'sbom') => {
     return `${API_BASE_URL}/reports/${scanId}/download/${type}`;

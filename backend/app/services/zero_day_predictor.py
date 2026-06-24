@@ -52,7 +52,7 @@ RISKY_PACKAGE_KEYWORDS = {
 }
 
 
-def _count_dependencies(sbom: dict | None) -> int:
+def _count_dependencies(sbom: Optional[dict]) -> int:
     """Extract the count of dependencies from CycloneDX SBOM."""
     if not sbom:
         return 0
@@ -60,7 +60,7 @@ def _count_dependencies(sbom: dict | None) -> int:
     return len(components)
 
 
-def _count_risky_packages(sbom: dict | None) -> int:
+def _count_risky_packages(sbom: Optional[dict]) -> int:
     """Count packages belonging to high-risk categories."""
     if not sbom:
         return 0
@@ -80,7 +80,7 @@ def _count_critical_high_cves(findings: list[RawFinding]) -> int:
     )
 
 
-def _estimate_avg_dependency_age(sbom: dict | None) -> float:
+def _estimate_avg_dependency_age(sbom: Optional[dict]) -> float:
     """
     Estimate average dependency age in years.
     In a real implementation, this would query PyPI release dates.

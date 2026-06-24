@@ -23,7 +23,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union, Dict
 import structlog
 
 from reportlab.lib import colors
@@ -841,9 +841,9 @@ def generate_all_reports(
     zero_day_level: str,
     compliance_summary: dict,
     summary: dict,
-    sbom: dict | None,
-    reports_dir: str | Path,
-) -> dict[str, str | None]:
+    sbom: Optional[dict],
+    reports_dir: Union[str, Path],
+) -> Dict[str, Optional[str]]:
     """
     Generate all report artifacts: PDF, SARIF, and SBOM export.
 
@@ -854,7 +854,7 @@ def generate_all_reports(
     reports_dir.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(timezone.utc)
 
-    paths: dict[str, str | None] = {
+    paths: Dict[str, Optional[str]] = {
         "pdf_path": None,
         "sarif_path": None,
         "sbom_path": None,
