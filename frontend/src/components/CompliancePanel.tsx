@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building, ShieldCheck, CreditCard, ShieldAlert, AlertTriangle, ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { Building, ShieldCheck, CreditCard, AlertTriangle, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface CompliancePanelProps {
@@ -15,8 +15,8 @@ export default function CompliancePanel({ findings }: CompliancePanelProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {/* RBI IT Framework */}
-      <ComplianceCard 
-        title="RBI IT Framework 2021" 
+      <ComplianceCard
+        title="RBI IT Framework 2021"
         desc="RBI Cyber Security guidelines for digital payment gateways and transaction routing"
         icon={<Building className="w-5 h-5" />}
         violations={rbiViolations}
@@ -24,8 +24,8 @@ export default function CompliancePanel({ findings }: CompliancePanelProps) {
       />
 
       {/* PCI-DSS 4.0 */}
-      <ComplianceCard 
-        title="PCI-DSS v4.0" 
+      <ComplianceCard
+        title="PCI-DSS v4.0"
         desc="Cardholder Data Environment (CDE) protection standards and transit encryption"
         icon={<CreditCard className="w-5 h-5" />}
         violations={pciViolations}
@@ -33,8 +33,8 @@ export default function CompliancePanel({ findings }: CompliancePanelProps) {
       />
 
       {/* SWIFT CSP */}
-      <ComplianceCard 
-        title="SWIFT CSP" 
+      <ComplianceCard
+        title="SWIFT CSP"
         desc="Customer Security Programme control guidelines for international message authentication"
         icon={<ShieldCheck className="w-5 h-5" />}
         violations={swiftViolations}
@@ -69,7 +69,7 @@ function ComplianceCard({ title, desc, icon, violations, clauseKey }: Compliance
 
   const uniqueClauses = Object.keys(clauseGroups);
   const totalViolations = violations.length;
-  
+
   // Calculate compliance health
   const healthScore = totalViolations === 0 ? 100 : Math.max(10, 100 - totalViolations * 12);
   const isCompliant = totalViolations === 0;
@@ -83,8 +83,8 @@ function ComplianceCard({ title, desc, icon, violations, clauseKey }: Compliance
   return (
     <div className={cn(
       "flex flex-col bg-[#0b0e14]/90 border rounded-lg overflow-hidden transition-all duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.6)] select-none",
-      isCompliant 
-        ? "border-emerald-500/10 hover:border-emerald-500/25 hover:shadow-[0_0_20px_rgba(16,185,129,0.05)]" 
+      isCompliant
+        ? "border-emerald-500/10 hover:border-emerald-500/25 hover:shadow-[0_0_20px_rgba(16,185,129,0.05)]"
         : "border-rose-500/10 hover:border-rose-500/25 hover:shadow-[0_0_20px_rgba(244,63,94,0.05)]"
     )}>
       {/* Top Header Row */}
@@ -93,8 +93,8 @@ function ComplianceCard({ title, desc, icon, violations, clauseKey }: Compliance
           <div className="flex items-center gap-3">
             <div className={cn(
               "p-2.5 rounded border flex items-center justify-center transition-colors",
-              isCompliant 
-                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" 
+              isCompliant
+                ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400"
                 : "bg-rose-500/5 border-rose-500/20 text-rose-400"
             )}>
               {icon}
@@ -106,12 +106,12 @@ function ComplianceCard({ title, desc, icon, violations, clauseKey }: Compliance
               </p>
             </div>
           </div>
-          
+
           {/* Compliant Status Badge */}
           <span className={cn(
             "px-2 py-0.5 rounded-sm border text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm whitespace-nowrap",
-            isCompliant 
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+            isCompliant
+              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
               : "bg-rose-500/10 border-rose-500/20 text-rose-400 animate-pulse"
           )}>
             <span className={cn("w-1.5 h-1.5 rounded-full", isCompliant ? "bg-emerald-400" : "bg-rose-500")} />
@@ -126,7 +126,7 @@ function ComplianceCard({ title, desc, icon, violations, clauseKey }: Compliance
             <span className={isCompliant ? "text-emerald-400" : "text-rose-400"}>{healthScore}% Health</span>
           </div>
           <div className="h-1.5 bg-slate-950 border border-slate-900 rounded overflow-hidden flex">
-            <div 
+            <div
               className={cn(
                 "h-full transition-all duration-700",
                 isCompliant ? "bg-emerald-500" : healthScore > 60 ? "bg-amber-500" : "bg-rose-500"
