@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8000/api/v1";
+const API_BASE_URL = "https://kavach-production-23d9.up.railway.app/api/v1";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -14,7 +14,7 @@ export const api = {
   uploadRepo: async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    
+
     const response = await apiClient.post("/scan", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
@@ -40,7 +40,7 @@ export const api = {
     const response = await apiClient.get(`/reports/${scanId}`);
     return response.data;
   },
-  
+
   // Trigger a scan using a pre-made sandbox payload (low, medium, high)
   startPremadeScan: async (riskLevel: 'low' | 'medium' | 'high') => {
     const response = await apiClient.post(`/scan/premade/${riskLevel}`);
