@@ -39,7 +39,7 @@ MODULE_WEIGHTS: list[tuple[list[str], float, str]] = [
     (["payment", "pay", "transaction", "transfer", "remittance", "upi", "neft", "imps", "rtgs"], 3.0, "Payments"),
     (["auth", "login", "jwt", "session", "oauth", "token", "password", "credential", "2fa", "mfa"], 2.5, "Authentication"),
     (["customer", "kyc", "pii", "personal", "account", "user_data", "profile", "aadhaar", "pan"], 2.0, "CustomerData"),
-    (["admin", "management", "superuser", "root", "dashboard", "config", "setting"], 1.5, "AdminPortal"),
+    (["admin", "management", "superuser", "dashboard"], 1.5, "AdminPortal"),
     (["report", "audit", "log", "analytics", "statement", "export"], 1.0, "Reporting"),
 ]
 
@@ -70,6 +70,11 @@ def _infer_module(finding: RawFinding) -> tuple[str, float]:
     Infer the banking module and weight from a finding's file path and category.
     Returns (module_label, weight).
     """
+    file_path_lower = (finding.file_path or "").lower()
+    infra_keywords = ["dockerfile", "docker-compose", ".github", "helm", "k8s", "terraform"]
+    if any(kw in file_path_lower for kw in infra_keywords):
+        return "Infrastructure", 1.0
+
     search_text = " ".join(filter(None, [
         finding.file_path or "",
         finding.category or "",
