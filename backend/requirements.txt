@@ -11,12 +11,31 @@ python-multipart
 # ----------------------------
 # Database
 # ----------------------------
+sqlalchemy>=2.0
+asyncpg
+alembic
+
+# ----------------------------
+# Redis / Background Jobs
+# ----------------------------
+redis
+celery
 
 # ----------------------------
 # Pydantic / Settings
 # ----------------------------
 pydantic
 pydantic-settings
+email-validator
+
+# ----------------------------
+# Auth
+# ----------------------------
+passlib[bcrypt]
+# LDAP SSO (app/auth/sso/ldap_provider.py) — pure-Python bind/search client,
+# no native/xmlsec dependency (unlike a real SAML toolkit, deliberately not
+# added — see saml_provider.py).
+ldap3
 
 # ----------------------------
 # Security Scanning
@@ -24,16 +43,38 @@ pydantic-settings
 semgrep
 pip-audit
 cyclonedx-bom
+ast-grep-cli
+pyyaml
+# Joern is NOT pip-installable — separate JVM tool, install independently
+# in the worker image if you want it active (see joern_scanner.py docstring)
 
 # ----------------------------
 # AI
 # ----------------------------
-google-generativeai
+# All providers (Claude, OpenAI, Gemini, Ollama, vLLM) are called over
+# plain REST via httpx (already a dependency below) — no provider SDKs
+# needed. See app/services/ai/providers/.
 
 # ----------------------------
 # Report Generation
 # ----------------------------
 reportlab
+# S3/MinIO report storage (app/services/reports/storage.py) — MinIO is
+# S3-API-compatible, so plain boto3 covers both via S3_ENDPOINT_URL.
+boto3
+
+# ----------------------------
+# Observability
+# ----------------------------
+prometheus-client
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-instrumentation-celery
+opentelemetry-instrumentation-httpx
+opentelemetry-instrumentation-redis
 
 # ----------------------------
 # Utilities
@@ -41,7 +82,6 @@ reportlab
 python-dotenv
 aiofiles
 httpx
-tenacity
 structlog
 python-jose[cryptography]
 

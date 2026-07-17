@@ -1,0 +1,92 @@
+{
+  "title": "KAVACH — Celery & Scanners",
+  "uid": "kavach-celery",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "utc",
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "tags": ["kavach"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "label": "Prometheus"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Scanner runs by outcome",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "kavach_scanner_runs", "legendFormat": "{{scanner}} — {{outcome}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Scanner failure rate",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        {
+          "expr": "kavach_scanner_runs{outcome=\"failure\"} / (kavach_scanner_runs{outcome=\"failure\"} + on(scanner) kavach_scanner_runs{outcome=\"success\"})",
+          "legendFormat": "{{scanner}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "Average scanner duration",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "kavach_scanner_avg_duration_seconds", "legendFormat": "{{scanner}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Scan jobs by status",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "kavach_scan_jobs_by_status", "legendFormat": "{{status}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Celery task rate by state (celery-exporter)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "description": "Requires monitoring.celeryExporter.enabled=true.",
+      "targets": [
+        { "expr": "sum(rate(celery_task_total[5m])) by (state)", "legendFormat": "{{state}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Active Celery workers (celery-exporter)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "description": "Requires monitoring.celeryExporter.enabled=true.",
+      "targets": [
+        { "expr": "celery_workers", "legendFormat": "workers" }
+      ]
+    }
+  ]
+}

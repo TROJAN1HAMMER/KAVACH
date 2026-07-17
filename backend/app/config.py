@@ -4,8 +4,9 @@ Reads all settings from environment variables with sensible defaults.
 """
 
 from functools import lru_cache
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from typing import Annotated
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from pydantic import Field, field_validator
 import os
 
 
@@ -29,15 +30,248 @@ class Settings(BaseSettings):
     reports_dir: str = Field(default="reports", env="REPORTS_DIR")
     data_dir: str = Field(default="data", env="DATA_DIR")
 
-    # Gemini AI
+    # AI — LLM provider abstraction (see app/services/ai/gateway.py). Every
+    # provider is optional; unconfigured ones are skipped by is_configured()
+    # rather than attempted and failed.
+    #
+    # ai_mode is the primary switch (see gateway.py's _resolve_provider_order):
+    #   "cloud"  — only claude/openai/gemini are ever attempted.
+    #   "local"  — only ollama/vllm are ever attempted; no cloud fallback,
+    #              even if cloud keys happen to be configured.
+    #   "hybrid" (default) — local first, cloud as fallback: "if local
+    #              available use local, otherwise cloud". A local provider
+    #              counts as "available" only if it actually answers — an
+    #              unreachable Ollama/vLLM server fails over to cloud rather
+    #              than blocking on it, since the gateway tries providers in
+    #              order and only advances past one on failure.
+    #
+    # ai_provider_priority is an advanced escape hatch: leave it as "auto"
+    # (default) to derive the order from ai_mode, or set an explicit
+    # comma-separated list (e.g. "vllm,ollama,claude") to override it
+    # outright, bypassing ai_mode entirely.
+    ai_mode: str = Field(default="hybrid", env="AI_MODE")
+    ai_provider_priority: str = Field(default="auto", env="AI_PROVIDER_PRIORITY")
+    ai_cache_ttl_seconds: int = Field(default=86400, env="AI_CACHE_TTL_SECONDS")
+
+    anthropic_api_key: str = Field(default="", env="ANTHROPIC_API_KEY")
+    anthropic_model: str = Field(default="claude-sonnet-5", env="ANTHROPIC_MODEL")
+
+    openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+
     gemini_api_key: str = Field(default="", env="GEMINI_API_KEY")
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = Field(default="gemini-1.5-flash", env="GEMINI_MODEL")
+
+    # Local/self-hosted — no API key, just a reachable endpoint. Off by
+    # default in practice: is_configured() requires ollama_model/vllm_model
+    # to be set, since an empty served-model name can't be requested.
+    # Known-good tags/repos for the 4 models KAVACH is validated against
+    # (see app/services/ai/local_models.py) — any Ollama tag or
+    # vLLM-servable HF repo works, these are just the ones with the most
+    # testing:
+    #   Ollama:  ollama_model = "llama3" | "mistral" | "phi3" | "mixtral"
+    #   vLLM:    vllm_model   = "meta-llama/Meta-Llama-3-8B-Instruct" |
+    #                           "mistralai/Mistral-7B-Instruct-v0.3" |
+    #                           "microsoft/Phi-3-mini-4k-instruct" |
+    #                           "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    ollama_base_url: str = Field(default="http://localhost:11434", env="OLLAMA_BASE_URL")
+    ollama_model: str = Field(default="", env="OLLAMA_MODEL")
+
+    vllm_base_url: str = Field(default="http://localhost:8000", env="VLLM_BASE_URL")
+    vllm_model: str = Field(default="", env="VLLM_MODEL")
+
+    # NVD (National Vulnerability Database) — unauthenticated requests are
+    # rate-limited to 5/30s; an API key raises that to 50/30s. Without one,
+    # nvd_scanner.py deliberately caps how many packages it queries per scan.
+    nvd_api_key: str = Field(default="", env="NVD_API_KEY")
+
+    # Report storage (see app/services/reports/storage.py). "local" (default)
+    # keeps the current behavior — reports live under reports_dir on the
+    # worker's own disk, nothing new to configure. "s3" uploads every
+    # generated report to an S3-compatible bucket (real AWS S3, or MinIO —
+    # MinIO speaks the same API, just point s3_endpoint_url at it) and
+    # downloads are served via short-lived presigned URLs instead of
+    # streaming the file through the API process.
+    report_storage_backend: str = Field(default="local", env="REPORT_STORAGE_BACKEND")
+    s3_endpoint_url: str = Field(default="", env="S3_ENDPOINT_URL")  # blank = real AWS; set for MinIO, e.g. http://localhost:9000
+    s3_bucket: str = Field(default="kavach-reports", env="S3_BUCKET")
+    s3_region: str = Field(default="us-east-1", env="S3_REGION")
+    s3_access_key_id: str = Field(default="", env="S3_ACCESS_KEY_ID")
+    s3_secret_access_key: str = Field(default="", env="S3_SECRET_ACCESS_KEY")
+    # MinIO (and some S3-compatible stores) require path-style bucket
+    # addressing (http://host/bucket/key) instead of virtual-hosted-style
+    # (http://bucket.host/key), which real AWS S3 doesn't need.
+    s3_use_path_style: bool = Field(default=True, env="S3_USE_PATH_STYLE")
+    s3_presigned_url_expiry_seconds: int = Field(default=3600, env="S3_PRESIGNED_URL_EXPIRY_SECONDS")
 
     # CORS
-    allowed_origins: list[str] = Field(
+    # `NoDecode` is required, not cosmetic: pydantic-settings' default
+    # env-var handling for any complex-typed field (list, dict, ...)
+    # attempts to JSON-decode the raw string *before* any Pydantic-level
+    # validator ever sees it — a field_validator alone can't intercept or
+    # fix that, since by then pydantic-settings has already raised trying
+    # to json.loads() a plain comma-separated string. NoDecode disables
+    # that source-level auto-decoding so the validator below gets the raw
+    # string and can parse it correctly. Confirmed broken without this:
+    # it crashed Celery beat/worker container startup the first time
+    # ALLOWED_ORIGINS was actually supplied via a real environment
+    # variable (a Kubernetes ConfigMap) in the documented
+    # comma-separated format (`.env.example`'s
+    # `ALLOWED_ORIGINS=http://a,http://b`) instead of silently falling
+    # back to the Python-side default list, which is all any earlier
+    # local testing had ever exercised.
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:3000", "http://localhost:5173"],
         env="ALLOWED_ORIGINS",
     )
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def _parse_allowed_origins(cls, value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                import json
+
+                return json.loads(stripped)  # explicit JSON array still supported
+            return [origin.strip() for origin in stripped.split(",") if origin.strip()]
+        return value
+
+    # Database (SQLAlchemy 2 async engine + Alembic)
+    database_url: str = Field(
+        default="postgresql+asyncpg://kavach:kavach_secret@localhost:5432/kavach_db",
+        env="DATABASE_URL",
+    )
+    database_echo: bool = Field(default=False, env="DATABASE_ECHO")
+
+    # Redis / Celery
+    redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
+    celery_broker_url: str = Field(default="", env="CELERY_BROKER_URL")
+    celery_result_backend: str = Field(default="", env="CELERY_RESULT_BACKEND")
+
+    # JWT Authentication
+    jwt_secret_key: str = Field(default="change-me-jwt-32chars-minimum", env="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    refresh_token_expire_days: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")
+
+    # SSO — OAuth2/OIDC (see app/auth/sso/oauth2_provider.py). Generic
+    # authorization-code-flow client that works against any standards-
+    # compliant IdP (Okta, Auth0, Azure AD, Google, Keycloak, ...) — point
+    # the 4 URLs at your provider's discovery document values. Unconfigured
+    # (blank client_id) means the /auth/sso/oauth2/* routes respond 503
+    # rather than attempting a flow with empty credentials.
+    oauth2_enabled: bool = Field(default=False, env="OAUTH2_ENABLED")
+    oauth2_client_id: str = Field(default="", env="OAUTH2_CLIENT_ID")
+    oauth2_client_secret: str = Field(default="", env="OAUTH2_CLIENT_SECRET")
+    oauth2_authorize_url: str = Field(default="", env="OAUTH2_AUTHORIZE_URL")
+    oauth2_token_url: str = Field(default="", env="OAUTH2_TOKEN_URL")
+    oauth2_userinfo_url: str = Field(default="", env="OAUTH2_USERINFO_URL")
+    oauth2_redirect_uri: str = Field(default="", env="OAUTH2_REDIRECT_URI")
+    oauth2_scope: str = Field(default="openid email profile", env="OAUTH2_SCOPE")
+
+    # SSO — LDAP (see app/auth/sso/ldap_provider.py). Real bind-based
+    # authentication via `ldap3` — binds as ldap_bind_dn to search for the
+    # user's DN, then re-binds as that DN with the user's own password to
+    # verify it (the standard "search+bind" pattern; avoids requiring every
+    # client to know their own DN).
+    ldap_enabled: bool = Field(default=False, env="LDAP_ENABLED")
+    ldap_server_url: str = Field(default="", env="LDAP_SERVER_URL")  # e.g. "ldap://localhost:389"
+    ldap_bind_dn: str = Field(default="", env="LDAP_BIND_DN")
+    ldap_bind_password: str = Field(default="", env="LDAP_BIND_PASSWORD")
+    ldap_user_search_base: str = Field(default="", env="LDAP_USER_SEARCH_BASE")
+    ldap_user_search_filter: str = Field(default="(uid={username})", env="LDAP_USER_SEARCH_FILTER")
+    ldap_email_attribute: str = Field(default="mail", env="LDAP_EMAIL_ATTRIBUTE")
+    ldap_full_name_attribute: str = Field(default="cn", env="LDAP_FULL_NAME_ATTRIBUTE")
+    ldap_use_ssl: bool = Field(default=False, env="LDAP_USE_SSL")
+
+    # SSO — SAML 2.0 (see app/auth/sso/saml_provider.py). Placeholder: the
+    # config surface, routes, and interface are real and ready to wire up,
+    # but signature/assertion validation itself isn't implemented — that
+    # needs a SAML XML toolkit (e.g. python3-saml) with native xmlsec
+    # bindings, deliberately not added as a dependency here. Until then,
+    # /auth/sso/saml/* routes respond 503 regardless of these settings.
+    saml_enabled: bool = Field(default=False, env="SAML_ENABLED")
+    saml_idp_metadata_url: str = Field(default="", env="SAML_IDP_METADATA_URL")
+    saml_idp_entity_id: str = Field(default="", env="SAML_IDP_ENTITY_ID")
+    saml_sp_entity_id: str = Field(default="kavach", env="SAML_SP_ENTITY_ID")
+    saml_acs_url: str = Field(default="", env="SAML_ACS_URL")  # Assertion Consumer Service callback URL
+
+    # Audit log retention — sweep_stalled_jobs-style periodic cleanup isn't
+    # wired up automatically; this just bounds how far back
+    # GET /auth/audit-log queries are allowed to look without an explicit
+    # override, so a careless "since the beginning of time" query can't
+    # accidentally full-scan a huge table.
+    audit_log_default_lookback_days: int = Field(default=90, env="AUDIT_LOG_DEFAULT_LOOKBACK_DAYS")
+
+    # Notifications (see app/services/notifications/) — fired when a scan
+    # completes with findings at or above notify_min_severity, when a scan
+    # fails outright, and when the stalled-job sweeper detects a crashed
+    # worker. Every channel is independently optional: leaving a channel's
+    # URL/host blank just means that channel is skipped, not an error, and
+    # each configured channel is attempted even if another one fails.
+    notifications_enabled: bool = Field(default=False, env="NOTIFICATIONS_ENABLED")
+    notify_min_severity: str = Field(default="CRITICAL", env="NOTIFY_MIN_SEVERITY")
+
+    slack_webhook_url: str = Field(default="", env="SLACK_WEBHOOK_URL")
+
+    email_smtp_host: str = Field(default="", env="EMAIL_SMTP_HOST")
+    email_smtp_port: int = Field(default=587, env="EMAIL_SMTP_PORT")
+    email_smtp_username: str = Field(default="", env="EMAIL_SMTP_USERNAME")
+    email_smtp_password: str = Field(default="", env="EMAIL_SMTP_PASSWORD")
+    email_smtp_use_tls: bool = Field(default=True, env="EMAIL_SMTP_USE_TLS")
+    email_from_address: str = Field(default="kavach@example.com", env="EMAIL_FROM_ADDRESS")
+    email_to_addresses: Annotated[list[str], NoDecode] = Field(default=[], env="EMAIL_TO_ADDRESSES")
+
+    webhook_url: str = Field(default="", env="WEBHOOK_URL")
+    # HMAC-SHA256-signs the payload (header X-KAVACH-Signature) when set,
+    # the same pattern GitHub/Stripe webhooks use — lets the receiver
+    # verify a notification genuinely came from this KAVACH instance
+    # rather than trusting an unauthenticated POST to a public URL.
+    webhook_secret: str = Field(default="", env="WEBHOOK_SECRET")
+
+    # Inbound GitHub webhook (see app/api/v1/endpoints/webhooks.py) — the
+    # other direction from webhook_url/webhook_secret above: GitHub calling
+    # *into* KAVACH on push events, not KAVACH calling out. Verified via
+    # the `X-Hub-Signature-256` header GitHub signs every delivery with,
+    # using this same shared secret configured on the GitHub repo/org
+    # webhook settings page. Left blank, the endpoint refuses every
+    # delivery with 503 rather than accepting unsigned payloads — there is
+    # no "insecure but working" mode for a publicly-reachable endpoint.
+    github_webhook_secret: str = Field(default="", env="GITHUB_WEBHOOK_SECRET")
+    # A push event fires a scan for whichever branch was pushed, not just
+    # the repository's default branch, unless this is turned off.
+    github_webhook_scan_all_branches: bool = Field(default=True, env="GITHUB_WEBHOOK_SCAN_ALL_BRANCHES")
+
+    # Data lifecycle — how long a terminal (completed/failed/cancelled)
+    # scan job's on-disk report artifacts are kept before the nightly
+    # archive sweep (app/tasks/archive_tasks.py) reclaims the space. The
+    # ScanJob/Finding/ScanResult database rows are never deleted, only the
+    # generated report files — findings/BRS/compliance history stays
+    # queryable in the Risk/Executive dashboards indefinitely; only the
+    # heavier rendered artifacts (PDFs, SARIF, SBOM, ...) are reclaimed.
+    archive_after_days: int = Field(default=90, env="ARCHIVE_AFTER_DAYS")
+
+    @field_validator("email_to_addresses", mode="before")
+    @classmethod
+    def _parse_email_to_addresses(cls, value):
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("["):
+                import json
+
+                return json.loads(stripped)
+            return [addr.strip() for addr in stripped.split(",") if addr.strip()]
+        return value
+
+    @property
+    def resolved_celery_broker_url(self) -> str:
+        """Falls back to redis_url so a single REDIS_URL is enough for local dev."""
+        return self.celery_broker_url or self.redis_url
+
+    @property
+    def resolved_celery_result_backend(self) -> str:
+        return self.celery_result_backend or self.redis_url
 
     def ensure_dirs(self) -> None:
         """Create required directories if they do not exist."""

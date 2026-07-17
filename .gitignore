@@ -46,3 +46,6 @@ backend/reports/
 backend/data/*.json
 frontend/dist/
 frontend/node_modules/
+backend/celerybeat-schedule.bak
+backend/celerybeat-schedule.dat
+backend/celerybeat-schedule.dir

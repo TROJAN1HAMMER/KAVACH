@@ -1,0 +1,85 @@
+{
+  "title": "KAVACH — Risk Trend",
+  "uid": "kavach-risk-trend",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "timezone": "utc",
+  "time": { "from": "now-90d", "to": "now" },
+  "refresh": "1h",
+  "tags": ["kavach"],
+  "description": "Business risk over time — pulled straight from Postgres (scan_results/findings), not Prometheus: this is historical business data KAVACH already persists, not a metric worth duplicating into a time-series database with its own retention/cardinality trade-offs.",
+  "templating": {
+    "list": [
+      {
+        "name": "DS_POSTGRES",
+        "type": "datasource",
+        "query": "postgres",
+        "current": {},
+        "hide": 0,
+        "label": "KAVACH Postgres"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Banking Risk Score trend (avg / max per day)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', sr.created_at) AS time, AVG(sr.brs_score) AS avg_brs_score, MAX(sr.brs_score) AS max_brs_score FROM scan_results sr WHERE $__timeFilter(sr.created_at) GROUP BY 1 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "max": 100, "min": 0 }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Findings by severity, per day",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', f.created_at) AS time, f.severity, COUNT(*) AS count FROM findings f WHERE $__timeFilter(f.created_at) GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Current risk by repository (latest scan)",
+      "type": "table",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "targets": [
+        {
+          "format": "table",
+          "rawSql": "SELECT r.name AS repository, sr.brs_score, sr.brs_risk_level, sr.zero_day_risk_score, sr.created_at AS last_scanned FROM scan_results sr JOIN scan_jobs sj ON sr.scan_job_id = sj.id JOIN repositories r ON sj.repository_id = r.id WHERE sr.created_at = (SELECT MAX(sr2.created_at) FROM scan_results sr2 JOIN scan_jobs sj2 ON sr2.scan_job_id = sj2.id WHERE sj2.repository_id = r.id) ORDER BY sr.brs_score DESC",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Compliant-scan percentage by framework, per day",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 28 },
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "description": "compliance_summary (JSONB, one row per scan) records violations/compliant per framework, not a percentage — this computes 'percentage of scans with zero violations for this framework' per day from that boolean, which is what's actually stored (see app/services/compliance/compliance_mapper.py's get_compliance_summary()).",
+      "targets": [
+        {
+          "format": "time_series",
+          "rawSql": "SELECT date_trunc('day', sr.created_at) AS time, framework.key AS framework, 100.0 * AVG(CASE WHEN (framework.value->>'compliant')::boolean THEN 1 ELSE 0 END) AS compliant_scan_pct FROM scan_results sr, jsonb_each(sr.compliance_summary) AS framework WHERE $__timeFilter(sr.created_at) AND jsonb_typeof(framework.value) = 'object' GROUP BY 1, 2 ORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 }, "overrides": [] }
+    }
+  ]
+}

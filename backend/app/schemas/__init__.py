@@ -1,10 +1,20 @@
-from app.schemas.scan import ScanStatusResponse, ScanCreateResponse, ReportPathsResponse
-from app.schemas.finding import FindingResponse, FindingsListResponse, RawFinding, ComplianceMappingSchema
+from app.schemas.finding import ComplianceMappingSchema, FindingResponse, FindingsListResponse, RawFinding
+from app.schemas.report import ReportPathsResponse
+from app.schemas.repository import RepositoryResponse
+from app.schemas.scan_job import (
+    ScanJobCreateResponse,
+    ScanJobListResponse,
+    ScanJobStatusResponse,
+    ScanJobSubmitRequest,
+)
 
 __all__ = [
-    "ScanStatusResponse",
-    "ScanCreateResponse",
     "ReportPathsResponse",
+    "RepositoryResponse",
+    "ScanJobCreateResponse",
+    "ScanJobListResponse",
+    "ScanJobStatusResponse",
+    "ScanJobSubmitRequest",
     "FindingResponse",
     "FindingsListResponse",
     "RawFinding",

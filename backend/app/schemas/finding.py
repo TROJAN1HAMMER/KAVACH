@@ -23,7 +23,7 @@ class ComplianceMappingSchema(BaseModel):
 
 class FindingResponse(BaseModel):
     id: uuid.UUID
-    scan_id: uuid.UUID
+    scan_job_id: uuid.UUID
     title: str
     severity: str
     category: str
@@ -42,13 +42,25 @@ class FindingResponse(BaseModel):
     ai_remediation: Optional[str] = None
     compliance: Optional[ComplianceMappingSchema] = None
 
+    # Aggregation-layer enrichment (app/services/aggregation/) — cross-tool
+    # provenance + taxonomy mapping. Full CVE detail and the complete
+    # correlation group are in the unified_findings.json report artifact,
+    # not duplicated here.
+    sources: Optional[list[str]] = None
+    occurrence_count: int = 1
+    cwe_id: Optional[str] = None
+    cwe_name: Optional[str] = None
+    owasp_category: Optional[str] = None
+    owasp_name: Optional[str] = None
+    mitre_technique_ids: Optional[list[str]] = None
+
     model_config = {"from_attributes": True}
 
 
 # ── Findings List Response ────────────────────────────────────────────────────
 
 class FindingsListResponse(BaseModel):
-    scan_id: uuid.UUID
+    scan_job_id: uuid.UUID
     total: int
     findings: list[FindingResponse]
 

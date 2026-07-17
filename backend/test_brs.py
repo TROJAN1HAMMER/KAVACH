@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from app.services.scan_orchestrator import execute_scan
+from app.orchestrator.scan_pipeline import execute_scan
 import json
 
 async def main():
