@@ -107,8 +107,8 @@ def _to_status_response(
         total_findings=result.total_findings if result else None,
         brs_score=result.brs_score if result else None,
         brs_risk_level=result.brs_risk_level if result else None,
-        zero_day_risk_score=result.zero_day_risk_score if result else None,
-        zero_day_risk_level=result.zero_day_risk_level if result else None,
+        attack_surface_exposure_score=result.attack_surface_exposure_score if result else None,
+        attack_surface_exposure_level=result.attack_surface_exposure_level if result else None,
         summary=result.summary if result else None,
         worker_status=scan_status.get_worker_status(str(job.id)),
     )
@@ -321,7 +321,7 @@ async def get_scan_job_status(
     results: Annotated[ScanResultRepository, Depends(get_scan_result_repository)],
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
-    """Get the current status/progress of a scan job, including BRS and Zero-Day scores once completed."""
+    """Get the current status/progress of a scan job, including BRS and Attack Surface Exposure scores once completed."""
     job = await scan_jobs.get(scan_job_id)
     if not job:
         raise NotFoundError("Scan job not found")
@@ -450,7 +450,12 @@ async def scan_progress_ws(
             await websocket.send_json(event)
 
             if event.get("type") == "job_status" and event.get("status") in _TERMINAL_STATUSES:
-                fresh_job = await scan_jobs.get(scan_job_id)
+                # `fresh=True`: `job` (loaded once, above, when the socket
+                # connected) is already in this session's identity map, so a
+                # plain `.get()` here would silently hand back that same
+                # stale object instead of re-querying — see the docstring on
+                # ScanJobRepository.get().
+                fresh_job = await scan_jobs.get(scan_job_id, fresh=True)
                 if fresh_job is not None:
                     await send_snapshot(fresh_job)
                 break

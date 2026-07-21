@@ -16,7 +16,13 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.core.logging import configure_logging
-from app.core.metrics import REGISTRY, collect_business_metrics, collect_scanner_metrics
+from app.core.metrics import (
+    REGISTRY,
+    collect_business_metrics,
+    collect_rag_document_metrics,
+    collect_rag_redis_metrics,
+    collect_scanner_metrics,
+)
 from app.core.telemetry import instrument_fastapi, instrument_httpx, instrument_redis, instrument_sqlalchemy, setup_telemetry
 from app.db.session import AsyncSessionLocal, engine
 from app.core.error_handlers import register_exception_handlers
@@ -24,6 +30,8 @@ from app.middleware.metrics_middleware import MetricsMiddleware
 from app.middleware.permission_middleware import PermissionMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
+from app.services.assistant import rerank_manager
+from app.services.knowledge_base import embedding_manager
 
 settings = get_settings()
 configure_logging(settings)
@@ -121,6 +129,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Report downloads set a real filename via Content-Disposition; without
+    # exposing it, browser JS (fetch/axios) can't read that header even
+    # though the file body itself isn't blocked by CORS. The current
+    # frontend supplies its own filename and doesn't strictly need this,
+    # but exposing it is correct practice and unblocks reading it later.
+    expose_headers=["Content-Disposition"],
 )
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(RateLimitMiddleware, requests_per_window=100, window_seconds=60)
@@ -196,6 +210,14 @@ async def readiness(response: Response) -> dict:
         healthy = False
 
     try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'vector'"))
+        checks["vector_extension"] = "ready"
+    except Exception as exc:
+        checks["vector_extension"] = f"error: {exc}"
+        healthy = False
+
+    try:
         redis_client = redis_asyncio.from_url(settings.redis_url, decode_responses=True)
         try:
             await redis_client.ping()
@@ -205,6 +227,19 @@ async def readiness(response: Response) -> dict:
     except Exception as exc:
         checks["redis"] = f"error: {exc}"
         healthy = False
+
+    # RAG models (Milestone 5) — both are lazy singletons (see
+    # embedding_manager._get_model / rerank_manager._get_model), so this
+    # forces the one-time load on whichever probe hits it first rather
+    # than reporting "ready" before confirming the model can actually load.
+    # Deliberately NOT fatal to overall readiness (`healthy` stays
+    # unaffected): the knowledge base/RAG features degrade gracefully
+    # without these (search/chat return a clear 503 from their own code
+    # paths), whereas the core scanning platform this pod also serves
+    # does not depend on them at all — a model-load failure shouldn't take
+    # scan/report/compliance traffic out of rotation too.
+    checks["embedding_model"] = "ready" if embedding_manager.is_ready() else "not_ready"
+    checks["rerank_model"] = "ready" if rerank_manager.is_ready() else "not_ready"
 
     response.status_code = 200 if healthy else 503
     return {"status": "ready" if healthy else "not_ready", "checks": checks}
@@ -220,7 +255,9 @@ async def metrics() -> Response:
     """
     async with AsyncSessionLocal() as db:
         await collect_business_metrics(db)
+        await collect_rag_document_metrics(db)
     collect_scanner_metrics()
+    collect_rag_redis_metrics()
     return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
 
 

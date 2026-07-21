@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, computed_field
 
 from app.models.enums import AuthProvider, UserRole
 
@@ -29,6 +29,26 @@ class UserRead(BaseModel):
     auth_provider: AuthProvider
 
     model_config = {"from_attributes": True}
+
+    # Computed, not stored: the frontend gets both the raw role (for
+    # anything backend-specific, e.g. PATCH .../role) and the resolved
+    # display name + permission set for this exact role, so route
+    # guarding/nav filtering/permission-aware UI reads one source of truth
+    # (app/auth/permissions.py's ROLE_PERMISSIONS) instead of duplicating
+    # the matrix in TypeScript where it could drift out of sync.
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def role_display_name(self) -> str:
+        from app.auth.permissions import ROLE_DISPLAY_NAMES
+
+        return ROLE_DISPLAY_NAMES.get(self.role, self.role.value)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def permissions(self) -> list[str]:
+        from app.auth.permissions import ROLE_PERMISSIONS
+
+        return sorted(p.value for p in ROLE_PERMISSIONS.get(self.role, frozenset()))
 
 
 class TokenResponse(BaseModel):

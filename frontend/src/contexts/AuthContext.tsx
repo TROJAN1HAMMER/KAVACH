@@ -6,7 +6,10 @@ import type { User } from "../types/api";
 interface AuthContextValue {
   user: User | null;
   status: "loading" | "authenticated" | "unauthenticated";
-  login: (email: string, password: string) => Promise<void>;
+  // Resolves with the freshly-fetched user so callers (e.g. LoginPage) can
+  // route based on role immediately, without waiting an extra render for
+  // context state to catch up.
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
 }
 
@@ -51,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const me = await authApi.me();
     setUser(me);
     setStatus("authenticated");
+    return me;
   }, []);
 
   const value = useMemo(() => ({ user, status, login, logout }), [user, status, login, logout]);

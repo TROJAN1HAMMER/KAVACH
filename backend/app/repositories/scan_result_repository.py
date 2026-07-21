@@ -22,8 +22,8 @@ class ScanResultRepository:
         total_findings: int,
         brs_score: float,
         brs_risk_level: str,
-        zero_day_risk_score: float,
-        zero_day_risk_level: str,
+        attack_surface_exposure_score: float,
+        attack_surface_exposure_level: str,
         summary: dict,
         compliance_summary: dict,
     ) -> ScanResult:
@@ -32,8 +32,8 @@ class ScanResultRepository:
             total_findings=total_findings,
             brs_score=brs_score,
             brs_risk_level=brs_risk_level,
-            zero_day_risk_score=zero_day_risk_score,
-            zero_day_risk_level=zero_day_risk_level,
+            attack_surface_exposure_score=attack_surface_exposure_score,
+            attack_surface_exposure_level=attack_surface_exposure_level,
             summary=summary,
             compliance_summary=compliance_summary,
         )

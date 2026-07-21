@@ -66,6 +66,48 @@
   }
 }
 
+/* Skeleton loader sweep — only `transform` is animated (a translateX pass
+   over a static gradient), never a layout- or paint-heavy property. Used by
+   components/ui/Skeleton.tsx, which itself skips rendering this element
+   entirely under prefers-reduced-motion, but the media query below is kept
+   as a second line of defense for any other consumer. */
+@keyframes skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-skeleton-sweep {
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+/* Slow, low-amplitude opacity pulse for "this is actively in progress" UI
+   (a running scan's status badge / active scanner row) — deliberately not
+   a spinner or a game-HUD glow, just a gentle breathing effect. */
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton-sweep,
+  .animate-pulse-slow {
+    animation: none;
+  }
+}
+
 @layer utilities {
   ::-webkit-scrollbar {
     width: 8px;

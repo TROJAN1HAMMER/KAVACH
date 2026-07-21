@@ -1,4 +1,5 @@
 import type { HTMLAttributes } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { severityStyle } from "../../lib/severity";
 import type { Severity } from "../../types/api";
@@ -16,8 +17,21 @@ const toneClasses: Record<Tone, string> = {
 export function Badge({
   className,
   tone = "neutral",
+  children,
   ...props
 }: HTMLAttributes<HTMLSpanElement> & { tone?: Tone }) {
+  const shouldReduceMotion = useReducedMotion();
+  // Badges here mostly reflect a status (scan queued -> running -> completed,
+  // user active/inactive) that can change live under the same instance. For
+  // the common case — plain text/number content — a `key`'d motion.span
+  // makes that change read as a soft fade to the new state rather than an
+  // instant swap, with no AnimatePresence/exit handling needed: the old
+  // content is simply gone the instant React swaps keys, and the new
+  // content fades in over the (unanimated) pill background. Composite
+  // children (icon + text, etc.) don't have a stable primitive identity to
+  // key on, so they're rendered plainly rather than guessing one.
+  const isPrimitive = typeof children === "string" || typeof children === "number";
+
   return (
     <span
       className={cn(
@@ -26,7 +40,20 @@ export function Badge({
         className,
       )}
       {...props}
-    />
+    >
+      {isPrimitive ? (
+        <motion.span
+          key={`${tone}-${children}`}
+          initial={shouldReduceMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+        >
+          {children}
+        </motion.span>
+      ) : (
+        children
+      )}
+    </span>
   );
 }
 

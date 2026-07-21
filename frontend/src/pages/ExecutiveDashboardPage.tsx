@@ -4,11 +4,13 @@ import { BarChart3, Database, ShieldAlert, Siren } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { StatTile } from "../components/ui/StatTile";
 import { Card, CardContent, CardHeader } from "../components/ui/Card";
-import { FullPageSpinner } from "../components/ui/Spinner";
+import { SkeletonStatTiles, SkeletonChartCard, SkeletonTable } from "../components/ui/Skeleton";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Badge } from "../components/ui/Badge";
+import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { BrsTrendChart } from "../components/charts/BrsTrendChart";
 import { SeverityDistributionChart } from "../components/charts/SeverityDistributionChart";
+import { ExecutiveIntelligencePanel } from "../components/executive/ExecutiveIntelligencePanel";
 import { useRepositories } from "../hooks/useRepositories";
 import { useScanJobs } from "../hooks/useScanJobs";
 import { extractSeverityCounts } from "../lib/severity";
@@ -77,7 +79,19 @@ export default function ExecutiveDashboardPage() {
     return [...byRepo.values()].sort((a, b) => b.score - a.score).slice(0, 5);
   }, [completedJobs]);
 
-  if (loadingRepos || loadingScans) return <FullPageSpinner />;
+  if (loadingRepos || loadingScans) {
+    return (
+      <div>
+        <PageHeader title="Executive Summary" description="A portfolio-level view of security posture across every repository." />
+        <SkeletonStatTiles className="mb-6" />
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SkeletonChartCard />
+          <SkeletonChartCard />
+        </div>
+        <SkeletonTable rows={5} columns={3} />
+      </div>
+    );
+  }
 
   if (completedJobs.length === 0) {
     return (
@@ -92,56 +106,78 @@ export default function ExecutiveDashboardPage() {
     <div>
       <PageHeader title="Executive Summary" description="A portfolio-level view of security posture across every repository." />
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile label="Repositories" value={repositories?.length ?? 0} icon={<Database className="size-5" />} />
-        <StatTile label="Completed scans" value={completedJobs.length} icon={<BarChart3 className="size-5" />} />
-        <StatTile
-          label="Portfolio avg BRS"
-          value={formatScore(portfolioSummary.avgBrs)}
-          icon={<ShieldAlert className="size-5" />}
-        />
-        <StatTile
-          label="Critical findings"
-          value={portfolioSummary.criticalCount}
-          icon={<Siren className="size-5" />}
-        />
-      </div>
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <RevealItem>
+          <StatTile label="Repositories" value={repositories?.length ?? 0} icon={<Database className="size-5" />} />
+        </RevealItem>
+        <RevealItem>
+          <StatTile label="Completed scans" value={completedJobs.length} icon={<BarChart3 className="size-5" />} />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label="Portfolio avg BRS"
+            value={formatScore(portfolioSummary.avgBrs)}
+            icon={<ShieldAlert className="size-5" />}
+          />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label="Critical findings"
+            value={portfolioSummary.criticalCount}
+            icon={<Siren className="size-5" />}
+          />
+        </RevealItem>
+      </RevealSection>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Risk trend" description="Banking Risk Score across the most recent 30 scans." />
-          <CardContent>
-            <BrsTrendChart points={trendPoints} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader title="Findings by severity" description="Aggregated across every completed scan." />
-          <CardContent>
-            <SeverityDistributionChart counts={portfolioSummary.severityTotals} />
-          </CardContent>
-        </Card>
-      </div>
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Risk trend" description="Banking Risk Score across the most recent 30 scans." />
+            <CardContent>
+              <BrsTrendChart points={trendPoints} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Findings by severity" description="Aggregated across every completed scan." />
+            <CardContent>
+              <SeverityDistributionChart counts={portfolioSummary.severityTotals} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
 
-      <Card>
-        <CardHeader title="Top risk repositories" description="Highest Banking Risk Score observed per repository." />
-        <CardContent className="space-y-3">
-          {topRiskRepos.map((repo) => (
-            <div
-              key={repo.id}
-              onClick={() => navigate(`/risk`)}
-              className="flex cursor-pointer items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/60"
-            >
-              <div>
-                <p className="font-medium text-foreground">{repo.name}</p>
-                <Badge tone={repo.score >= 70 ? "danger" : repo.score >= 40 ? "warning" : "success"} className="mt-1">
-                  {repo.riskLevel ?? "—"}
-                </Badge>
-              </div>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">{repo.score.toFixed(0)}</p>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <RevealSection>
+        <RevealItem>
+          <Card>
+            <CardHeader title="Top risk repositories" description="Highest Banking Risk Score observed per repository." />
+            <CardContent className="space-y-3">
+              {topRiskRepos.map((repo) => (
+                <div
+                  key={repo.id}
+                  onClick={() => navigate(`/risk`)}
+                  className="flex cursor-pointer items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted/60"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{repo.name}</p>
+                    <Badge tone={repo.score >= 70 ? "danger" : repo.score >= 40 ? "warning" : "success"} className="mt-1">
+                      {repo.riskLevel ?? "—"}
+                    </Badge>
+                  </div>
+                  <p className="text-2xl font-semibold tabular-nums text-foreground">{repo.score.toFixed(0)}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
+
+      <RevealSection>
+        <RevealItem>
+          <ExecutiveIntelligencePanel />
+        </RevealItem>
+      </RevealSection>
     </div>
   );
 }

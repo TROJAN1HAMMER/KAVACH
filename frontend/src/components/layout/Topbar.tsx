@@ -27,7 +27,7 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
             </div>
             <div className="leading-tight">
               <p className="text-sm font-medium text-foreground">{user.full_name || user.email}</p>
-              <p className="text-xs capitalize text-muted-foreground">{user.role.replace("_", " ")}</p>
+              <p className="text-xs text-muted-foreground">{user.role_display_name}</p>
             </div>
           </div>
         )}

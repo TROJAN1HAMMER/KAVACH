@@ -6,9 +6,10 @@ import { Button } from "../components/ui/Button";
 import { Input, Label } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { isAxiosError } from "axios";
+import { defaultRouteForRole } from "../lib/rbac";
 
 export default function LoginPage() {
-  const { login, status } = useAuth();
+  const { login, status, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -17,7 +18,10 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (status === "authenticated") {
-    const redirectTo = (location.state as { from?: string } | null)?.from ?? "/repositories";
+    // Send a role back to wherever it was headed (e.g. a deep link) if we
+    // know that; otherwise its own default landing page — not always
+    // /repositories, since Executive/Read Only can't reach that route.
+    const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultRouteForRole(user?.role);
     return <Navigate to={redirectTo} replace />;
   }
 
@@ -26,8 +30,9 @@ export default function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email, password);
-      navigate("/repositories", { replace: true });
+      const me = await login(email, password);
+      const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultRouteForRole(me.role);
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       if (isAxiosError(err) && !err.response) {
         // Request never got a response at all — the backend is unreachable,

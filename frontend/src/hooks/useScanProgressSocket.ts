@@ -32,8 +32,25 @@ export function useScanProgressSocket(scanJobId: string | undefined, enabled = t
   const queryClient = useQueryClient();
   const reconnectAttempt = useRef(0);
 
+  // Read only at connect-time, deliberately NOT a reactive effect
+  // dependency: `enabled` is typically derived by the caller from this
+  // same job's status (see ScanDetailPanel), which this hook itself writes
+  // into the query cache. If `enabled` were a dependency, the moment the
+  // lightweight `job_status: completed` event landed in the cache the
+  // resulting re-render would flip `enabled` to false and tear this effect
+  // down mid-flight — closing the socket before the second message (the
+  // full snapshot with brs_score/total_findings/finished_at etc., sent
+  // right after) had a chance to arrive. Gating only at connect-time still
+  // skips opening a socket for a job that was already terminal when this
+  // component mounted, without risking a self-inflicted early close once
+  // connected.
+  const enabledRef = useRef(enabled);
   useEffect(() => {
-    if (!scanJobId || !enabled) return;
+    enabledRef.current = enabled;
+  }, [enabled]);
+
+  useEffect(() => {
+    if (!scanJobId || !enabledRef.current) return;
 
     let socket: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -97,5 +114,6 @@ export function useScanProgressSocket(scanJobId: string | undefined, enabled = t
       if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
-  }, [scanJobId, enabled, queryClient]);
+    // `enabled` intentionally excluded — see enabledRef's comment above.
+  }, [scanJobId, queryClient]);
 }

@@ -310,6 +310,41 @@ def score_finding(
     return FindingScore(brs=brs, module=module.name, sub_scores={k: round(v, 2) for k, v in sub_scores.items()})
 
 
+_ZERO_FINDINGS_BASE_RESIDUAL = 5.0
+_COVERAGE_UNCERTAINTY_MAX = 3.0
+
+
+def _residual_uncertainty_baseline(scanner_coverage_ratio: float) -> float:
+    """
+    A scan reporting zero findings is not the same claim as "this
+    repository is provably secure" — no static/dependency/secrets scan
+    pipeline can rule out every class of vulnerability (logic flaws,
+    unknown-unknowns, issues outside scanner coverage), and banking
+    security review panels correctly reject a literal 0/100 as an
+    overclaim. This models that residual uncertainty deterministically,
+    from a real signal already available at scoring time — how much of
+    the scanner suite actually completed — rather than a random or
+    hardcoded fudge factor:
+
+      - `_ZERO_FINDINGS_BASE_RESIDUAL` (5.0): the floor even at full
+        (9/9) scanner coverage — "nothing was found" is never reported
+        as "nothing to find."
+      - Up to `_COVERAGE_UNCERTAINTY_MAX` (3.0) more, scaled linearly by
+        how much of the scanner suite did NOT complete — a clean result
+        from 5/9 scanners is less conclusive than a clean result from
+        9/9, and should read as (slightly) less certain, not identically
+        confident.
+
+    `scanner_coverage_ratio` is `scanners_succeeded / total_scanners`,
+    1.0 meaning every scanner ran to completion. Result stays within
+    the existing "Low" risk tier (well under the 35 cutoff in
+    `_calculate_risk_level`) — this changes "0" to "a small, explained
+    number," not the tier boundaries or their meaning.
+    """
+    incomplete_fraction = max(0.0, min(1.0, 1.0 - scanner_coverage_ratio))
+    return round(_ZERO_FINDINGS_BASE_RESIDUAL + incomplete_fraction * _COVERAGE_UNCERTAINTY_MAX, 2)
+
+
 def _calculate_risk_level(brs: float) -> str:
     """
     Thresholds empirically calibrated against *this* formula, not
@@ -470,6 +505,7 @@ async def calculate_brs(
     db: Optional[AsyncSession] = None,
     repository_id: Optional[uuid.UUID] = None,
     compliance_data_list: Optional[list[Optional[ComplianceMappingData]]] = None,
+    scanner_coverage_ratio: float = 1.0,
 ) -> BRSResult:
     """
     Score every finding, then roll up into one scan-level BRS via
@@ -480,9 +516,14 @@ async def calculate_brs(
     tests exercise `score_finding()` directly instead, but this keeps
     `calculate_brs()` itself honest about degrading gracefully rather
     than requiring a live database to run at all.
+
+    `scanner_coverage_ratio` (scanners_succeeded / total_scanners, 1.0 by
+    default) only affects the zero-findings path — see
+    `_residual_uncertainty_baseline()`.
     """
     if not findings:
-        return BRSResult(total_brs=0.0, risk_level="Low", finding_scores=[])
+        residual = _residual_uncertainty_baseline(scanner_coverage_ratio)
+        return BRSResult(total_brs=residual, risk_level=_calculate_risk_level(residual), finding_scores=[])
 
     modules = await _load_modules(db)
     factor_weights = await _load_factor_weights(db)

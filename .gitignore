@@ -19,6 +19,8 @@ env/
 venv/
 .venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 build/
@@ -35,8 +37,44 @@ wheels/
 .installed.cfg
 *.egg
 
+# Environment files — real secrets/local overrides never get committed.
+# `.env.example` is intentionally NOT matched by this (git only matches the
+# exact filename `.env`, not `.env.example`) and stays tracked as the
+# documented template.
+.env
+.env.*
+!.env.example
+
 # OS files
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs / temp files
+*.log
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Flutter / Dart (mobile/ has its own, more complete .gitignore — these are
+# a defense-in-depth fallback in case a build is ever run from the repo
+# root instead of mobile/)
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
 
 # Kavach App specific
 backend/venv/
@@ -44,6 +82,9 @@ backend/env/
 backend/uploads/
 backend/reports/
 backend/data/*.json
+backend/data/fastembed_cache/
+backend/data/rerank_cache/
+backend/data/knowledge_base/
 frontend/dist/
 frontend/node_modules/
 backend/celerybeat-schedule.bak

@@ -31,7 +31,12 @@ email-validator
 # ----------------------------
 # Auth
 # ----------------------------
+# bcrypt pinned <4.1: passlib 1.7.4 (unmaintained since 2020) probes its
+# bcrypt backend with a fixed self-test string at first use, and bcrypt>=4.1
+# raises ValueError instead of the old truncate-silently behavior once that
+# probe exceeds 72 bytes — breaking every password hash/verify call outright.
 passlib[bcrypt]
+bcrypt<4.1
 # LDAP SSO (app/auth/sso/ldap_provider.py) — pure-Python bind/search client,
 # no native/xmlsec dependency (unlike a real SAML toolkit, deliberately not
 # added — see saml_provider.py).
@@ -56,6 +61,24 @@ pyyaml
 # needed. See app/services/ai/providers/.
 
 # ----------------------------
+# Knowledge Base (RAG Milestone 1 — see app/services/knowledge_base/)
+# ----------------------------
+# fastembed: ONNX-runtime embedding inference, no torch/GPU required — the
+# model runs fully in-process so document text never leaves the
+# deployment to reach a third-party embedding API (a real requirement for
+# banking-internal documentation, not just a convenience). Pre-downloaded
+# at image build time (see Dockerfile) so a container never needs internet
+# access at runtime.
+fastembed
+# pgvector: thin SQLAlchemy Vector type + `<=>` distance operator support.
+# The vector store itself is Postgres (via the pgvector extension, enabled
+# in migration 0011) — no separate vector database service to deploy.
+pgvector
+# PDF text extraction for document ingestion (pure-Python, no native deps
+# beyond what's already installed for reportlab).
+pypdf
+
+# ----------------------------
 # Report Generation
 # ----------------------------
 reportlab
@@ -66,15 +89,24 @@ boto3
 # ----------------------------
 # Observability
 # ----------------------------
+# The opentelemetry-instrumentation-* packages are released in lockstep as a
+# bundle (each pins its sibling packages with an exact ==) — leaving them
+# unpinned let pip resolve a stale 0.58b0-era bundle whose FastAPI
+# instrumentor doesn't understand a newer FastAPI's internal routing wrapper
+# (`_IncludedRouter`), crashing every CORS preflight (OPTIONS) request with
+# an AttributeError — i.e. every real cross-origin browser request, since
+# curl/server-to-server calls don't preflight and looked fine. Pinned to the
+# verified-working bundle below; bump all of these together, never one at a
+# time.
 prometheus-client
-opentelemetry-api
-opentelemetry-sdk
-opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-instrumentation-fastapi
-opentelemetry-instrumentation-sqlalchemy
-opentelemetry-instrumentation-celery
-opentelemetry-instrumentation-httpx
-opentelemetry-instrumentation-redis
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-exporter-otlp-proto-grpc==1.44.0
+opentelemetry-instrumentation-fastapi==0.65b0
+opentelemetry-instrumentation-sqlalchemy==0.65b0
+opentelemetry-instrumentation-celery==0.65b0
+opentelemetry-instrumentation-httpx==0.65b0
+opentelemetry-instrumentation-redis==0.65b0
 
 # ----------------------------
 # Utilities

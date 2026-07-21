@@ -70,8 +70,8 @@ class ScanJobStatusResponse(BaseModel):
     total_findings: Optional[int] = None
     brs_score: Optional[float] = None
     brs_risk_level: Optional[str] = None
-    zero_day_risk_score: Optional[float] = None
-    zero_day_risk_level: Optional[str] = None
+    attack_surface_exposure_score: Optional[float] = None
+    attack_surface_exposure_level: Optional[str] = None
     # The same dict app/services/scanning/aggregator.py's
     # summarize_findings() builds and app/tasks/aggregator_tasks.py
     # augments further, stored verbatim on ScanResult.summary — exposed

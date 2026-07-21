@@ -1,9 +1,10 @@
 """
 KAVACH — ScanResult Model
-The computed outcome of a completed ScanJob: BRS/zero-day scores plus the
-summary dicts used for report generation. Split from ScanJob (1:1) so a
-job can exist in any status — queued, running, failed — with no result
-row at all, rather than a wide table full of nulls until completion.
+The computed outcome of a completed ScanJob: BRS/attack-surface-exposure
+scores plus the summary dicts used for report generation. Split from
+ScanJob (1:1) so a job can exist in any status — queued, running, failed —
+with no result row at all, rather than a wide table full of nulls until
+completion.
 """
 
 import uuid
@@ -34,8 +35,8 @@ class ScanResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     total_findings: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     brs_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     brs_risk_level: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
-    zero_day_risk_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    zero_day_risk_level: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    attack_surface_exposure_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    attack_surface_exposure_level: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
 
     summary: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     compliance_summary: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)

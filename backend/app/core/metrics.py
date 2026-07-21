@@ -227,6 +227,165 @@ def collect_scanner_metrics() -> None:
         logger.warning("metrics.scanner_collect_failed", error=str(exc))
 
 
+# ── 4. RAG metrics (Milestone 5) ────────────────────────────────────────────────
+# Same two sub-patterns as tiers 2/3 above, applied to the knowledge base/
+# assistant/finding intelligence/executive intelligence features:
+# document counts are already durable in Postgres (tier-2-style, collected
+# fresh at scrape time); everything else (search/chat/ask latency, cache
+# hit rate, estimated token usage, feedback) is written into Redis by the
+# services themselves as it happens (tier-3-style) — necessary here too,
+# since RAG requests can land on any API pod and this process doesn't
+# share memory with whichever one actually served a given request.
+
+RAG_DOCUMENTS_BY_STATUS = Gauge(
+    "kavach_rag_documents_by_status",
+    "Current knowledge base document count by status (latest version of each document only)",
+    ["status"],
+    registry=REGISTRY,
+)
+RAG_OPERATIONS = Gauge(
+    "kavach_rag_operations",
+    "Cumulative RAG operation outcomes, mirrored from Redis",
+    ["feature", "outcome"],  # feature: knowledge_search|assistant_chat|finding_intelligence|executive_ask; outcome: success|error
+    registry=REGISTRY,
+)
+RAG_AVG_LATENCY_SECONDS = Gauge(
+    "kavach_rag_avg_latency_seconds",
+    "Rolling average end-to-end latency of a RAG operation",
+    ["feature"],
+    registry=REGISTRY,
+)
+RAG_CACHE_OPERATIONS = Gauge(
+    "kavach_rag_cache_operations",
+    "Cumulative embedding/rerank cache hit/miss counts",
+    ["cache", "outcome"],  # cache: embedding|rerank; outcome: hit|miss
+    registry=REGISTRY,
+)
+RAG_TOKEN_USAGE_ESTIMATED = Gauge(
+    "kavach_rag_token_usage_estimated_total",
+    (
+        "Estimated cumulative token usage for RAG LLM calls — the same "
+        "4-characters-per-token heuristic as app/services/ai/"
+        "token_estimator.py, an approximation, not an exact provider-"
+        "reported count (see docs/production_hardening.md for why)."
+    ),
+    ["feature", "direction"],  # direction: prompt|completion
+    registry=REGISTRY,
+)
+RAG_FEEDBACK = Gauge(
+    "kavach_rag_feedback_total",
+    "Cumulative user feedback submissions on RAG outputs",
+    ["feature", "rating"],  # rating: positive|negative
+    registry=REGISTRY,
+)
+
+KNOWN_RAG_FEATURES = ("knowledge_search", "assistant_chat", "finding_intelligence", "executive_ask")
+KNOWN_RAG_CACHES = ("embedding", "rerank")
+
+
+def _rag_metrics_key(suffix: str) -> str:
+    return f"kavach:metrics:rag:{suffix}"
+
+
+def record_rag_operation(feature: str, *, duration_seconds: float, success: bool) -> None:
+    """Called at the end of every knowledge-base search / assistant chat
+    turn / finding-intelligence lookup / executive-intelligence ask."""
+    try:
+        r = _get_redis()
+        key = _rag_metrics_key(f"ops:{feature}")
+        pipe = r.pipeline()
+        pipe.hincrby(key, "success" if success else "error", 1)
+        pipe.hincrbyfloat(key, "duration_sum", duration_seconds)
+        pipe.hincrby(key, "duration_count", 1)
+        pipe.expire(key, 60 * 60 * 24 * 7)
+        pipe.execute()
+    except redis.RedisError as exc:
+        logger.warning("metrics.rag_operation_record_failed", feature=feature, error=str(exc))
+
+
+def record_cache_result(cache: str, *, hit: bool) -> None:
+    try:
+        r = _get_redis()
+        key = _rag_metrics_key(f"cache:{cache}")
+        pipe = r.pipeline()
+        pipe.hincrby(key, "hit" if hit else "miss", 1)
+        pipe.expire(key, 60 * 60 * 24 * 7)
+        pipe.execute()
+    except redis.RedisError as exc:
+        logger.warning("metrics.rag_cache_record_failed", cache=cache, error=str(exc))
+
+
+def record_token_usage(feature: str, *, prompt_tokens: int, completion_tokens: int) -> None:
+    try:
+        r = _get_redis()
+        key = _rag_metrics_key(f"tokens:{feature}")
+        pipe = r.pipeline()
+        pipe.hincrby(key, "prompt", prompt_tokens)
+        pipe.hincrby(key, "completion", completion_tokens)
+        pipe.expire(key, 60 * 60 * 24 * 7)
+        pipe.execute()
+    except redis.RedisError as exc:
+        logger.warning("metrics.rag_token_record_failed", feature=feature, error=str(exc))
+
+
+def record_feedback(feature: str, *, positive: bool) -> None:
+    try:
+        r = _get_redis()
+        key = _rag_metrics_key(f"feedback:{feature}")
+        pipe = r.pipeline()
+        pipe.hincrby(key, "positive" if positive else "negative", 1)
+        pipe.expire(key, 60 * 60 * 24 * 30)
+        pipe.execute()
+    except redis.RedisError as exc:
+        logger.warning("metrics.rag_feedback_record_failed", feature=feature, error=str(exc))
+
+
+def collect_rag_redis_metrics() -> None:
+    """Called once per /metrics scrape — refreshes the Redis-backed RAG Gauges."""
+    try:
+        r = _get_redis()
+        for feature in KNOWN_RAG_FEATURES:
+            ops = r.hgetall(_rag_metrics_key(f"ops:{feature}"))
+            duration_count = int(ops.get("duration_count", 0))
+            RAG_OPERATIONS.labels(feature=feature, outcome="success").set(int(ops.get("success", 0)))
+            RAG_OPERATIONS.labels(feature=feature, outcome="error").set(int(ops.get("error", 0)))
+            RAG_AVG_LATENCY_SECONDS.labels(feature=feature).set(
+                float(ops.get("duration_sum", 0.0)) / duration_count if duration_count else 0.0
+            )
+
+            tokens = r.hgetall(_rag_metrics_key(f"tokens:{feature}"))
+            RAG_TOKEN_USAGE_ESTIMATED.labels(feature=feature, direction="prompt").set(int(tokens.get("prompt", 0)))
+            RAG_TOKEN_USAGE_ESTIMATED.labels(feature=feature, direction="completion").set(
+                int(tokens.get("completion", 0))
+            )
+
+            feedback = r.hgetall(_rag_metrics_key(f"feedback:{feature}"))
+            RAG_FEEDBACK.labels(feature=feature, rating="positive").set(int(feedback.get("positive", 0)))
+            RAG_FEEDBACK.labels(feature=feature, rating="negative").set(int(feedback.get("negative", 0)))
+
+        for cache in KNOWN_RAG_CACHES:
+            cache_data = r.hgetall(_rag_metrics_key(f"cache:{cache}"))
+            RAG_CACHE_OPERATIONS.labels(cache=cache, outcome="hit").set(int(cache_data.get("hit", 0)))
+            RAG_CACHE_OPERATIONS.labels(cache=cache, outcome="miss").set(int(cache_data.get("miss", 0)))
+    except redis.RedisError as exc:
+        logger.warning("metrics.rag_redis_collect_failed", error=str(exc))
+
+
+async def collect_rag_document_metrics(db: AsyncSession) -> None:
+    """Postgres-backed, same reasoning as `collect_business_metrics` — document
+    counts by status are already durable, no Redis round-trip needed."""
+    from app.models.knowledge import KnowledgeDocument
+
+    status_counts = await db.execute(
+        select(KnowledgeDocument.status, func.count(KnowledgeDocument.id))
+        .where(KnowledgeDocument.is_latest.is_(True))
+        .group_by(KnowledgeDocument.status)
+    )
+    counts_by_status = dict(status_counts.all())
+    for status in ("pending", "processing", "indexed", "failed"):
+        RAG_DOCUMENTS_BY_STATUS.labels(status=status).set(counts_by_status.get(status, 0))
+
+
 class ScannerTimer:
     """
     `with ScannerTimer() as t: ...`, then `t.elapsed` — a property, not a

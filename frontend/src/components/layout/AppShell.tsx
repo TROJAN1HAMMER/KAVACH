@@ -3,9 +3,15 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { FullPageSpinner } from "../ui/Spinner";
+import { useGlobalScanJobsWatcher } from "../../hooks/useScanJobs";
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Mounted once, for the whole authenticated app, regardless of which page
+  // is open — see useGlobalScanJobsWatcher's docstring for why this is
+  // needed on top of each page's own data fetching.
+  useGlobalScanJobsWatcher();
 
   return (
     <div className="flex min-h-screen bg-background">

@@ -500,7 +500,7 @@ def _fallback_pattern_scan(repo_path: Path) -> list[RawFinding]:
                                     category=rule["category"],
                                     # Honest label: this is the regex fallback,
                                     # not real Semgrep — do not conflate the two
-                                    # (see zero_day_predictor.py's matching source check).
+                                    # (see attack_surface_exposure.py's matching source check).
                                     source="semgrep-fallback",
                                     cvss=rule["cvss"],
                                     file_path=rel_path,

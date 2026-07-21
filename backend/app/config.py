@@ -30,6 +30,51 @@ class Settings(BaseSettings):
     reports_dir: str = Field(default="reports", env="REPORTS_DIR")
     data_dir: str = Field(default="data", env="DATA_DIR")
 
+    # Knowledge Base (RAG Milestone 1 — see app/services/knowledge_base/).
+    # Documents are stored on disk under this directory (mirroring
+    # reports_dir's local-storage pattern); only extracted text/chunks/
+    # embeddings are ever persisted to the database. `knowledge_embedding_*`
+    # must match the model actually pre-downloaded in the Dockerfile —
+    # changing the model name here without also rebuilding the image (and
+    # re-indexing existing documents, since a different model's vectors
+    # aren't comparable) will fail at first use.
+    knowledge_base_dir: str = Field(default="data/knowledge_base", env="KNOWLEDGE_BASE_DIR")
+    knowledge_embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", env="KNOWLEDGE_EMBEDDING_MODEL")
+    knowledge_embedding_dim: int = Field(default=384, env="KNOWLEDGE_EMBEDDING_DIM")
+    knowledge_embedding_cache_dir: str = Field(
+        default="data/fastembed_cache", env="KNOWLEDGE_EMBEDDING_CACHE_DIR"
+    )
+    # Chunk size measured with the same 4-chars/token heuristic as
+    # app/services/ai/token_estimator.py — not an exact tokenizer count,
+    # consistent with how the rest of KAVACH already budgets text.
+    knowledge_chunk_size_tokens: int = Field(default=350, env="KNOWLEDGE_CHUNK_SIZE_TOKENS")
+    knowledge_chunk_overlap_tokens: int = Field(default=50, env="KNOWLEDGE_CHUNK_OVERLAP_TOKENS")
+    knowledge_max_upload_mb: int = Field(default=25, env="KNOWLEDGE_MAX_UPLOAD_MB")
+    knowledge_search_default_top_k: int = Field(default=5, env="KNOWLEDGE_SEARCH_DEFAULT_TOP_K")
+
+    # AI Assistant (RAG Milestone 2 — see app/services/assistant/). Retrieval
+    # is two-stage: pull `assistant_retrieval_candidates` chunks by cosine
+    # similarity (vector_store.similarity_search, unchanged from Milestone 1),
+    # then rerank them with a local cross-encoder and keep only
+    # `assistant_top_k` for the LLM prompt / citations. The reranker is a
+    # second local ONNX model (same no-external-API-call reasoning as the
+    # embedding model), pre-downloaded into `assistant_rerank_cache_dir` at
+    # Docker build time.
+    assistant_rerank_model: str = Field(default="Xenova/ms-marco-MiniLM-L-6-v2", env="ASSISTANT_RERANK_MODEL")
+    assistant_rerank_cache_dir: str = Field(default="data/rerank_cache", env="ASSISTANT_RERANK_CACHE_DIR")
+    assistant_retrieval_candidates: int = Field(default=20, env="ASSISTANT_RETRIEVAL_CANDIDATES")
+    assistant_top_k: int = Field(default=5, env="ASSISTANT_TOP_K")
+    # The gate for "Never answer from model memory if nothing relevant is
+    # retrieved": confidence is the sigmoid-normalized cross-encoder score of
+    # the best-matching chunk (see rerank_manager.normalize_confidence). Below
+    # this threshold, the assistant returns the fixed "could not find
+    # sufficient information" message and never calls the LLM at all — this
+    # is a deterministic check, not left to the model's discretion.
+    assistant_min_confidence: float = Field(default=0.5, env="ASSISTANT_MIN_CONFIDENCE")
+    assistant_max_history_turns: int = Field(default=6, env="ASSISTANT_MAX_HISTORY_TURNS")
+    assistant_max_tokens: int = Field(default=1024, env="ASSISTANT_MAX_TOKENS")
+    assistant_temperature: float = Field(default=0.2, env="ASSISTANT_TEMPERATURE")
+
     # AI — LLM provider abstraction (see app/services/ai/gateway.py). Every
     # provider is optional; unconfigured ones are skipped by is_configured()
     # rather than attempted and failed.
@@ -278,6 +323,7 @@ class Settings(BaseSettings):
         os.makedirs(self.upload_dir, exist_ok=True)
         os.makedirs(self.reports_dir, exist_ok=True)
         os.makedirs(self.data_dir, exist_ok=True)
+        os.makedirs(self.knowledge_base_dir, exist_ok=True)
 
 
 @lru_cache

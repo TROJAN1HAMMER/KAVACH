@@ -60,7 +60,7 @@
       "targets": [
         {
           "format": "table",
-          "rawSql": "SELECT r.name AS repository, sr.brs_score, sr.brs_risk_level, sr.zero_day_risk_score, sr.created_at AS last_scanned FROM scan_results sr JOIN scan_jobs sj ON sr.scan_job_id = sj.id JOIN repositories r ON sj.repository_id = r.id WHERE sr.created_at = (SELECT MAX(sr2.created_at) FROM scan_results sr2 JOIN scan_jobs sj2 ON sr2.scan_job_id = sj2.id WHERE sj2.repository_id = r.id) ORDER BY sr.brs_score DESC",
+          "rawSql": "SELECT r.name AS repository, sr.brs_score, sr.brs_risk_level, sr.attack_surface_exposure_score, sr.created_at AS last_scanned FROM scan_results sr JOIN scan_jobs sj ON sr.scan_job_id = sj.id JOIN repositories r ON sj.repository_id = r.id WHERE sr.created_at = (SELECT MAX(sr2.created_at) FROM scan_results sr2 JOIN scan_jobs sj2 ON sr2.scan_job_id = sj2.id WHERE sj2.repository_id = r.id) ORDER BY sr.brs_score DESC",
           "refId": "A"
         }
       ]

@@ -7,11 +7,13 @@ import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { Modal } from "../components/ui/Modal";
 import { EmptyState } from "../components/ui/EmptyState";
-import { FullPageSpinner } from "../components/ui/Spinner";
+import { SkeletonTable } from "../components/ui/Skeleton";
 import { ProgressBar } from "../components/ui/ProgressBar";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../components/ui/Table";
+import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { cn, formatRelativeTime, formatScore } from "../lib/utils";
 import { useScanJobs } from "../hooks/useScanJobs";
+import { usePermissions } from "../hooks/usePermissions";
 import { NewScanModal } from "../components/scans/NewScanModal";
 import { ScanDetailPanel } from "../components/scans/ScanDetailPanel";
 import type { ScanJobStatus } from "../types/api";
@@ -41,6 +43,8 @@ export default function ScanQueuePage() {
 
   const [statusFilter, setStatusFilter] = useState<ScanJobStatus | "all">("all");
   const [newScanOpen, setNewScanOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canCreateScan = hasPermission("scan:create");
 
   const { data, isLoading } = useScanJobs(statusFilter === "all" ? {} : { status: statusFilter });
 
@@ -63,10 +67,12 @@ export default function ScanQueuePage() {
         title="Scan Queue"
         description="Every scan job KAVACH has run, with live progress for anything still in flight."
         action={
-          <Button onClick={() => setNewScanOpen(true)}>
-            <Plus className="size-4" />
-            New scan
-          </Button>
+          canCreateScan ? (
+            <Button onClick={() => setNewScanOpen(true)}>
+              <Plus className="size-4" />
+              New scan
+            </Button>
+          ) : undefined
         }
       />
 
@@ -88,63 +94,72 @@ export default function ScanQueuePage() {
       </div>
 
       {isLoading ? (
-        <FullPageSpinner />
+        <SkeletonTable rows={6} columns={6} />
       ) : jobs.length === 0 ? (
         <EmptyState
           icon={<ListChecks className="size-10" />}
           title="No scan jobs found"
           description="Start a new scan to see it appear here in real time."
           action={
-            <Button onClick={() => setNewScanOpen(true)}>
-              <Plus className="size-4" />
-              New scan
-            </Button>
+            canCreateScan ? (
+              <Button onClick={() => setNewScanOpen(true)}>
+                <Plus className="size-4" />
+                New scan
+              </Button>
+            ) : undefined
           }
         />
       ) : (
-        <Card>
-          <Table>
-            <TableHead>
-              <tr>
-                <TableHeaderCell>Repository</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell>Progress</TableHeaderCell>
-                <TableHeaderCell>BRS score</TableHeaderCell>
-                <TableHeaderCell>Queued</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
-              </tr>
-            </TableHead>
-            <TableBody>
-              {jobs.map((job) => (
-                <TableRow key={job.scan_job_id} clickable onClick={() => setClickedId(job.scan_job_id)}>
-                  <TableCell className="font-medium">{job.repository_name}</TableCell>
-                  <TableCell>
-                    <Badge tone={STATUS_TONE[job.status]} className="capitalize">
-                      {job.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="w-40">
-                    {job.status === "running" || job.status === "queued" ? (
-                      <div className="flex items-center gap-2">
-                        <ProgressBar value={job.progress_percent} className="w-24" />
-                        <span className="text-xs tabular-nums text-muted-foreground">{job.progress_percent}%</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="tabular-nums">{formatScore(job.brs_score)}</TableCell>
-                  <TableCell className="text-muted-foreground">{formatRelativeTime(job.queued_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setClickedId(job.scan_job_id)}>
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+        <RevealSection>
+          <RevealItem>
+            <Card>
+              <Table>
+                <TableHead>
+                  <tr>
+                    <TableHeaderCell>Repository</TableHeaderCell>
+                    <TableHeaderCell>Status</TableHeaderCell>
+                    <TableHeaderCell>Progress</TableHeaderCell>
+                    <TableHeaderCell>BRS score</TableHeaderCell>
+                    <TableHeaderCell>Queued</TableHeaderCell>
+                    <TableHeaderCell></TableHeaderCell>
+                  </tr>
+                </TableHead>
+                <TableBody>
+                  {jobs.map((job) => (
+                    <TableRow key={job.scan_job_id} clickable onClick={() => setClickedId(job.scan_job_id)}>
+                      <TableCell className="font-medium">{job.repository_name}</TableCell>
+                      <TableCell>
+                        <Badge
+                          tone={STATUS_TONE[job.status]}
+                          className={cn("capitalize", job.status === "running" && "animate-pulse-slow")}
+                        >
+                          {job.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="w-40">
+                        {job.status === "running" || job.status === "queued" ? (
+                          <div className="flex items-center gap-2">
+                            <ProgressBar value={job.progress_percent} className="w-24" />
+                            <span className="text-xs tabular-nums text-muted-foreground">{job.progress_percent}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{formatScore(job.brs_score)}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatRelativeTime(job.queued_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setClickedId(job.scan_job_id)}>
+                          View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          </RevealItem>
+        </RevealSection>
       )}
 
       <Modal open={Boolean(selectedId)} onClose={closeDetail} title="Scan details" size="xl">

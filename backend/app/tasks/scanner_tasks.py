@@ -125,7 +125,7 @@ def run_pip_audit_task(
 ) -> dict:
     """
     pip-audit's signature differs from the other 8: it also generates and
-    writes the CycloneDX SBOM (needed later by the zero-day predictor and
+    writes the CycloneDX SBOM (needed later by the attack surface exposure module and
     the SBOM report), and the sandbox "premade" demo repos use a
     deterministic mock vulnerability set instead of a real pip-audit run
     (see dependency_scanner.py's `_get_mock_vulnerabilities`) — logic that

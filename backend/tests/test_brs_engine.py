@@ -24,6 +24,7 @@ from app.services.risk.brs_engine import (
     DEFAULT_MODULES,
     FactorWeights,
     _calculate_risk_level,
+    _residual_uncertainty_baseline,
     classify_module,
     compliance_framework_count,
     rollup_scan_brs,
@@ -251,6 +252,38 @@ class TestRiskLevelThresholds:
 class TestRollupScanBrs:
     def test_empty_findings_list_scores_zero(self):
         assert rollup_scan_brs([]) == 0.0
+
+
+# ── _residual_uncertainty_baseline — a zero-findings scan is never reported ───
+# as a literal 0/100 (see calculate_brs's early-return branch, which calls this
+# instead of returning 0.0 outright) — a banking security review panel
+# correctly rejects "provably secure" as an overclaim no scanner suite can
+# support. ─────────────────────────────────────────────────────────────────────
+
+class TestResidualUncertaintyBaseline:
+    def test_full_coverage_is_just_the_base_floor(self):
+        assert _residual_uncertainty_baseline(1.0) == 5.0
+
+    def test_incomplete_coverage_adds_bounded_uncertainty(self):
+        # Half the scanner suite failed/didn't run — less conclusive than a
+        # clean result from the full suite, so a bit more residual risk, but
+        # nowhere near the "Low" tier's 35 cutoff.
+        assert _residual_uncertainty_baseline(0.5) == pytest.approx(6.5)
+
+    def test_zero_coverage_hits_the_capped_maximum(self):
+        assert _residual_uncertainty_baseline(0.0) == pytest.approx(8.0)
+
+    def test_result_always_stays_within_the_low_risk_tier(self):
+        for ratio in (0.0, 0.25, 0.5, 0.75, 1.0):
+            baseline = _residual_uncertainty_baseline(ratio)
+            assert _calculate_risk_level(baseline) == "Low"
+            assert baseline > 0.0  # the entire point — never a literal zero
+
+
+class TestRollupScanBrsFindingCountEffects:
+    """The rest of TestRollupScanBrs's original coverage — unchanged, just
+    restored to its own class after an earlier edit accidentally merged it
+    into TestResidualUncertaintyBaseline above."""
 
     def test_single_finding_equals_its_own_score(self):
         # n=1 gets zero volume adjustment, and a self-weighted average of

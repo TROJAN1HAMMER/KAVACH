@@ -21,4 +21,10 @@ export const queryKeys = {
   compliance: (scanJobId: string) => ["compliance", scanJobId] as const,
   reportStatus: (scanJobId: string) => ["report-status", scanJobId] as const,
   currentUser: () => ["current-user"] as const,
+  myActivity: () => ["my-activity"] as const,
+  teamActivity: () => ["team-activity"] as const,
+  adminUsers: (params?: unknown) => ["admin-users", params ?? {}] as const,
+  auditLog: (params?: unknown) => ["audit-log", params ?? {}] as const,
+  knowledgeDocuments: (params?: unknown) => ["knowledge-documents", params ?? {}] as const,
+  findingIntelligence: (findingId: string) => ["finding-intelligence", findingId] as const,
 };

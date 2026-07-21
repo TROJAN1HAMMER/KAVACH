@@ -314,7 +314,7 @@
           "Scanning"
         ],
         "summary": "Trigger Premade Scan",
-        "description": "Trigger a scan for one of the pre-made sample repositories: low, medium, or high.",
+        "description": "Trigger a scan for one of the pre-made benchmark repositories: very_low, low, medium, high, or critical.",
         "operationId": "trigger_premade_scan_api_v1_scan_premade__risk_level__post",
         "security": [
           {
@@ -362,7 +362,7 @@
           "Scanning"
         ],
         "summary": "Get Scan Job Status",
-        "description": "Get the current status/progress of a scan job, including BRS and Zero-Day scores once completed.",
+        "description": "Get the current status/progress of a scan job, including BRS and Attack Surface Exposure scores once completed.",
         "operationId": "get_scan_job_status_api_v1_scan__scan_job_id__get",
         "security": [
           {
@@ -1088,6 +1088,651 @@
             "OAuth2PasswordBearer": []
           }
         ]
+      }
+    },
+    "/api/v1/analytics/my-activity": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Get My Activity",
+        "description": "A user's own scan activity \u2014 always their own data, so any\nauthenticated active user can read it (no extra permission beyond\nbeing logged in; there's nothing to over-privilege here).",
+        "operationId": "get_my_activity_api_v1_analytics_my_activity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyActivitySummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/team-activity": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Get Team Activity",
+        "description": "Org-wide scan activity broken down per user \u2014 Security Manager/Admin only.",
+        "operationId": "get_team_activity_api_v1_analytics_team_activity_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamActivitySummary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/upload": {
+      "post": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "Upload Document",
+        "description": "Upload a PDF/Markdown/text document. Returns immediately with status\n\"pending\" \u2014 extraction/chunking/embedding runs asynchronously; poll\nGET /knowledge/documents to see it advance to \"indexed\" (or \"failed\").\n`tags` is a comma-separated string, e.g. \"pci-dss,payments\".",
+        "operationId": "upload_document_api_v1_knowledge_upload_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_document_api_v1_knowledge_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/knowledge/documents": {
+      "get": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "List Documents",
+        "operationId": "list_documents_api_v1_knowledge_documents_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Document Type"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tag"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/document/{document_id}": {
+      "delete": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "Delete Document",
+        "description": "Deletes the document row (cascades to its chunks) and its on-disk file.",
+        "operationId": "delete_document_api_v1_knowledge_document__document_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentDeleteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "post": {
+        "tags": [
+          "Knowledge Base"
+        ],
+        "summary": "Search Knowledge",
+        "operationId": "search_knowledge_api_v1_knowledge_search_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/assistant/chat": {
+      "post": {
+        "tags": [
+          "AI Assistant"
+        ],
+        "summary": "Chat",
+        "description": "Server-Sent Events stream. Event sequence:\n  \"retrieval\"           \u2014 always sent first: retrieved_count, confidence,\n                           and the full citation list (document, page,\n                           section, similarity score, excerpt).\n  \"insufficient_context\" \u2014 sent INSTEAD of any \"token\" events when the\n                           confidence gate fails; the LLM is never\n                           called in this case.\n  \"token\"                \u2014 one or more, the streamed answer text.\n  \"done\"                 \u2014 always sent last (after \"token\"s, never after\n                           \"insufficient_context\"): confidence,\n                           retrieved_count, latency_ms.\n  \"error\"                 \u2014 only if the stream fails part-way through.",
+        "operationId": "chat_api_v1_assistant_chat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/findings/{finding_id}/intelligence": {
+      "get": {
+        "tags": [
+          "Finding Intelligence"
+        ],
+        "summary": "Get Finding Intelligence",
+        "description": "Grounded, structured explanation of a finding via the knowledge base\n(see docs/finding_intelligence.md). Gated the same way every other\nfinding-read endpoint in scan.py is (`get_current_active_user`, no\nfiner-grained permission) \u2014 the frontend's route-level RBAC already\nlimits who reaches the Finding Explorer page this lives under.",
+        "operationId": "get_finding_intelligence_api_v1_findings__finding_id__intelligence_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "finding_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Finding Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FindingIntelligenceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/executive-intelligence/ask": {
+      "post": {
+        "tags": [
+          "Executive Intelligence"
+        ],
+        "summary": "Ask Executive Intelligence",
+        "description": "SSE stream. Event sequence:\n  \"evidence\"             \u2014 always first: the deterministic scan-history\n                           snapshot (see evidence_service.py) + any\n                           supplementary knowledge-base citations.\n  \"insufficient_context\" \u2014 sent INSTEAD of any \"token\"s when there is\n                           neither scan history nor KB support at all\n                           (an empty, brand-new deployment) \u2014 the LLM\n                           is never called in this case.\n  \"token\"                 \u2014 one or more, the streamed answer text.\n  \"done\"                  \u2014 latency, always last after \"token\"s.\n  \"error\"                  \u2014 only if the stream fails part-way through.",
+        "operationId": "ask_executive_intelligence_api_v1_executive_intelligence_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutiveAskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/executive-intelligence/export-pdf": {
+      "post": {
+        "tags": [
+          "Executive Intelligence"
+        ],
+        "summary": "Export Executive Intelligence Pdf",
+        "description": "Renders exactly the question/answer/evidence/citations passed in \u2014 see\napp/services/executive_intelligence/pdf_export.py's docstring for why\nthis never recomputes anything server-side at export time.",
+        "operationId": "export_executive_intelligence_pdf_api_v1_executive_intelligence_export_pdf_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExecutivePdfExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rag-operations/benchmark": {
+      "post": {
+        "tags": [
+          "RAG Operations"
+        ],
+        "summary": "Run Benchmark",
+        "description": "Triggers a live embed/search/rerank/(LLM) timing probe against the\nknowledge base as it exists right now \u2014 see benchmark_service.py.",
+        "operationId": "run_benchmark_api_v1_rag_operations_benchmark_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkResultSchema"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/rag-operations/search-analytics": {
+      "get": {
+        "tags": [
+          "RAG Operations"
+        ],
+        "summary": "Get Search Analytics",
+        "operationId": "get_search_analytics_api_v1_rag_operations_search_analytics_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feature",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchAnalyticsSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/feedback": {
+      "post": {
+        "tags": [
+          "RAG Operations"
+        ],
+        "summary": "Submit Feedback",
+        "operationId": "submit_feedback_api_v1_feedback_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/feedback/summary": {
+      "get": {
+        "tags": [
+          "RAG Operations"
+        ],
+        "summary": "Get Feedback Summary",
+        "operationId": "get_feedback_summary_api_v1_feedback_summary_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "feature",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Feature"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/auth/register": {
@@ -1982,6 +2627,71 @@
         "title": "AuthProvider",
         "description": "How a user's identity was established \u2014 see app/auth/sso/."
       },
+      "BenchmarkResultSchema": {
+        "properties": {
+          "ran_at": {
+            "type": "string",
+            "title": "Ran At"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkStageSchema"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "total_duration_ms": {
+            "type": "number",
+            "title": "Total Duration Ms"
+          },
+          "documents_indexed": {
+            "type": "integer",
+            "title": "Documents Indexed"
+          },
+          "llm_configured": {
+            "type": "boolean",
+            "title": "Llm Configured"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ran_at",
+          "stages",
+          "total_duration_ms",
+          "documents_indexed",
+          "llm_configured"
+        ],
+        "title": "BenchmarkResultSchema"
+      },
+      "BenchmarkStageSchema": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "avg_duration_ms": {
+            "type": "number",
+            "title": "Avg Duration Ms"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "avg_duration_ms"
+        ],
+        "title": "BenchmarkStageSchema"
+      },
       "Body_login_api_v1_auth_login_post": {
         "properties": {
           "grant_type": {
@@ -2040,6 +2750,53 @@
           "password"
         ],
         "title": "Body_login_api_v1_auth_login_post"
+      },
+      "Body_upload_document_api_v1_knowledge_upload_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_document_api_v1_knowledge_upload_post"
       },
       "Body_upload_repo_api_v1_scan_post": {
         "properties": {
@@ -2256,6 +3013,52 @@
         "type": "object",
         "title": "BusinessModuleUpdateRequest"
       },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "assistant"
+            ],
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 8000,
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "title": "ChatMessage"
+      },
+      "ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Message"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest"
+      },
       "ComplianceControlResultSchema": {
         "properties": {
           "requirement_id": {
@@ -2374,6 +3177,39 @@
         ],
         "title": "ComplianceEvidenceSchema"
       },
+      "ComplianceFrameworkEvidenceSchema": {
+        "properties": {
+          "framework_key": {
+            "type": "string",
+            "title": "Framework Key"
+          },
+          "framework_name": {
+            "type": "string",
+            "title": "Framework Name"
+          },
+          "compliant_repo_count": {
+            "type": "integer",
+            "title": "Compliant Repo Count"
+          },
+          "non_compliant_repo_count": {
+            "type": "integer",
+            "title": "Non Compliant Repo Count"
+          },
+          "total_violations": {
+            "type": "integer",
+            "title": "Total Violations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "framework_key",
+          "framework_name",
+          "compliant_repo_count",
+          "non_compliant_repo_count",
+          "total_violations"
+        ],
+        "title": "ComplianceFrameworkEvidenceSchema"
+      },
       "ComplianceMappingSchema": {
         "properties": {
           "rbi_clause": {
@@ -2412,6 +3248,750 @@
         },
         "type": "object",
         "title": "ComplianceMappingSchema"
+      },
+      "DocumentDeleteResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename"
+        ],
+        "title": "DocumentDeleteResponse"
+      },
+      "DocumentListItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "document_type": {
+            "type": "string",
+            "title": "Document Type"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "title": "File Size Bytes"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "chunk_count": {
+            "type": "integer",
+            "title": "Chunk Count"
+          },
+          "uploaded_by_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uploaded By Email"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "document_type",
+          "version",
+          "tags",
+          "status",
+          "file_size_bytes",
+          "chunk_count",
+          "created_at"
+        ],
+        "title": "DocumentListItem"
+      },
+      "DocumentListResponse": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentListItem"
+            },
+            "type": "array",
+            "title": "Documents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "documents"
+        ],
+        "title": "DocumentListResponse"
+      },
+      "DocumentUploadResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "document_type": {
+            "type": "string",
+            "title": "Document Type"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "filename",
+          "document_type",
+          "version",
+          "status",
+          "tags",
+          "created_at"
+        ],
+        "title": "DocumentUploadResponse"
+      },
+      "EvidenceSnapshotSchema": {
+        "properties": {
+          "generated_at": {
+            "type": "string",
+            "title": "Generated At"
+          },
+          "total_repositories": {
+            "type": "integer",
+            "title": "Total Repositories"
+          },
+          "total_completed_scans": {
+            "type": "integer",
+            "title": "Total Completed Scans"
+          },
+          "total_findings": {
+            "type": "integer",
+            "title": "Total Findings"
+          },
+          "findings_by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Findings By Severity"
+          },
+          "portfolio_average_brs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Average Brs"
+          },
+          "top_risk_repositories": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryRiskEvidenceSchema"
+            },
+            "type": "array",
+            "title": "Top Risk Repositories"
+          },
+          "compliance_by_framework": {
+            "items": {
+              "$ref": "#/components/schemas/ComplianceFrameworkEvidenceSchema"
+            },
+            "type": "array",
+            "title": "Compliance By Framework"
+          },
+          "weekly_trend": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyTrendPointSchema"
+            },
+            "type": "array",
+            "title": "Weekly Trend"
+          },
+          "week_over_week": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeekOverWeekDeltaSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "generated_at",
+          "total_repositories",
+          "total_completed_scans",
+          "total_findings"
+        ],
+        "title": "EvidenceSnapshotSchema"
+      },
+      "ExecutiveAskRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "ExecutiveAskRequest"
+      },
+      "ExecutiveCitation": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "section_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Path"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "similarity_score": {
+            "type": "number",
+            "title": "Similarity Score"
+          },
+          "excerpt": {
+            "type": "string",
+            "maxLength": 4000,
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "filename",
+          "similarity_score",
+          "excerpt"
+        ],
+        "title": "ExecutiveCitation"
+      },
+      "ExecutivePdfExportRequest": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Question"
+          },
+          "answer": {
+            "type": "string",
+            "maxLength": 20000,
+            "title": "Answer"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/EvidenceSnapshotSchema"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/ExecutiveCitation"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Citations"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answer",
+          "evidence"
+        ],
+        "title": "ExecutivePdfExportRequest",
+        "description": "Carries back exactly what the client already displayed \u2014 see\napp/services/executive_intelligence/pdf_export.py's docstring for why\nthis is never recomputed server-side at export time."
+      },
+      "FeedbackSubmitRequest": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "maxLength": 32,
+            "title": "Feature"
+          },
+          "reference_id": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Reference Id"
+          },
+          "rating": {
+            "type": "integer",
+            "enum": [
+              -1,
+              1
+            ],
+            "title": "Rating"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "reference_id",
+          "rating"
+        ],
+        "title": "FeedbackSubmitRequest"
+      },
+      "FeedbackSummaryResponse": {
+        "properties": {
+          "total_feedback": {
+            "type": "integer",
+            "title": "Total Feedback"
+          },
+          "positive_count": {
+            "type": "integer",
+            "title": "Positive Count"
+          },
+          "negative_count": {
+            "type": "integer",
+            "title": "Negative Count"
+          },
+          "positive_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Rate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_feedback",
+          "positive_count",
+          "negative_count"
+        ],
+        "title": "FeedbackSummaryResponse"
+      },
+      "FindingIntelligenceCitation": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "section_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Path"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "similarity_score": {
+            "type": "number",
+            "title": "Similarity Score"
+          },
+          "rerank_score": {
+            "type": "number",
+            "title": "Rerank Score"
+          },
+          "excerpt": {
+            "type": "string",
+            "title": "Excerpt"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "filename",
+          "similarity_score",
+          "rerank_score",
+          "excerpt"
+        ],
+        "title": "FindingIntelligenceCitation"
+      },
+      "FindingIntelligenceResponse": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "title": "Finding Id"
+          },
+          "cwe_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwe Id"
+          },
+          "cwe_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwe Name"
+          },
+          "owasp_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owasp Category"
+          },
+          "owasp_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owasp Name"
+          },
+          "mitre_technique_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Mitre Technique Ids"
+          },
+          "pci_clause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pci Clause"
+          },
+          "rbi_clause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rbi Clause"
+          },
+          "swift_clause": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Swift Clause"
+          },
+          "why_detected": {
+            "type": "string",
+            "title": "Why Detected"
+          },
+          "plain_english_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plain English Explanation"
+          },
+          "business_impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Business Impact"
+          },
+          "technical_impact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Technical Impact"
+          },
+          "recommended_remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Remediation"
+          },
+          "verification_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Verification Steps"
+          },
+          "code_example": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code Example"
+          },
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/FindingIntelligenceCitation"
+            },
+            "type": "array",
+            "title": "Citations"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "retrieved_count": {
+            "type": "integer",
+            "title": "Retrieved Count"
+          },
+          "grounded": {
+            "type": "boolean",
+            "title": "Grounded"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "finding_id",
+          "why_detected",
+          "confidence",
+          "retrieved_count",
+          "grounded",
+          "latency_ms"
+        ],
+        "title": "FindingIntelligenceResponse"
       },
       "FindingResponse": {
         "properties": {
@@ -2763,6 +4343,128 @@
         ],
         "title": "LDAPLoginRequest"
       },
+      "MyActivitySummary": {
+        "properties": {
+          "total_scans": {
+            "type": "integer",
+            "title": "Total Scans"
+          },
+          "scans_by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Scans By Status"
+          },
+          "total_findings": {
+            "type": "integer",
+            "title": "Total Findings"
+          },
+          "findings_by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Findings By Severity"
+          },
+          "average_scan_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Scan Duration Seconds"
+          },
+          "average_brs_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Brs Score"
+          },
+          "recent_scans": {
+            "items": {
+              "$ref": "#/components/schemas/RecentScanSummary"
+            },
+            "type": "array",
+            "title": "Recent Scans"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_scans",
+          "scans_by_status",
+          "total_findings",
+          "findings_by_severity",
+          "recent_scans"
+        ],
+        "title": "MyActivitySummary",
+        "description": "A Security Analyst's own workload/efficiency view \u2014 see\nROLE_DISPLAY_NAMES in app/auth/permissions.py for the role mapping."
+      },
+      "RecentScanSummary": {
+        "properties": {
+          "scan_job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Scan Job Id"
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "brs_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brs Score"
+          },
+          "brs_risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brs Risk Level"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scan_job_id",
+          "repository_name",
+          "status"
+        ],
+        "title": "RecentScanSummary"
+      },
       "RefreshTokenRequest": {
         "properties": {
           "refresh_token": {
@@ -2922,6 +4624,51 @@
           "provider"
         ],
         "title": "RepositoryResponse"
+      },
+      "RepositoryRiskEvidenceSchema": {
+        "properties": {
+          "repository_id": {
+            "type": "string",
+            "title": "Repository Id"
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name"
+          },
+          "latest_brs_score": {
+            "type": "number",
+            "title": "Latest Brs Score"
+          },
+          "latest_brs_risk_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Brs Risk Level"
+          },
+          "latest_scan_finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Scan Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repository_id",
+          "repository_name",
+          "latest_brs_score"
+        ],
+        "title": "RepositoryRiskEvidenceSchema"
       },
       "RiskFactorWeightResponse": {
         "properties": {
@@ -3223,7 +4970,7 @@
             ],
             "title": "Brs Risk Level"
           },
-          "zero_day_risk_score": {
+          "attack_surface_exposure_score": {
             "anyOf": [
               {
                 "type": "number"
@@ -3232,9 +4979,9 @@
                 "type": "null"
               }
             ],
-            "title": "Zero Day Risk Score"
+            "title": "Attack Surface Exposure Score"
           },
-          "zero_day_risk_level": {
+          "attack_surface_exposure_level": {
             "anyOf": [
               {
                 "type": "string"
@@ -3243,7 +4990,7 @@
                 "type": "null"
               }
             ],
-            "title": "Zero Day Risk Level"
+            "title": "Attack Surface Exposure Level"
           },
           "summary": {
             "anyOf": [
@@ -3494,6 +5241,325 @@
         ],
         "title": "ScorePreviewResponse"
       },
+      "SearchAnalyticsRecentEntry": {
+        "properties": {
+          "feature": {
+            "type": "string",
+            "title": "Feature"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "result_count": {
+            "type": "integer",
+            "title": "Result Count"
+          },
+          "top_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top Score"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feature",
+          "query",
+          "result_count",
+          "latency_ms",
+          "created_at"
+        ],
+        "title": "SearchAnalyticsRecentEntry"
+      },
+      "SearchAnalyticsSummaryResponse": {
+        "properties": {
+          "total_searches": {
+            "type": "integer",
+            "title": "Total Searches"
+          },
+          "average_latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Latency Ms"
+          },
+          "average_result_count": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Result Count"
+          },
+          "zero_result_count": {
+            "type": "integer",
+            "title": "Zero Result Count"
+          },
+          "zero_result_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Zero Result Rate"
+          },
+          "recent_searches": {
+            "items": {
+              "$ref": "#/components/schemas/SearchAnalyticsRecentEntry"
+            },
+            "type": "array",
+            "title": "Recent Searches"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_searches",
+          "zero_result_count",
+          "recent_searches"
+        ],
+        "title": "SearchAnalyticsSummaryResponse"
+      },
+      "SearchRequest": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "top_k": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "title": "Top K",
+            "default": 5
+          },
+          "document_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "title": "SearchRequest"
+      },
+      "SearchResponse": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "took_ms": {
+            "type": "number",
+            "title": "Took Ms"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchResultItem"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "took_ms",
+          "results"
+        ],
+        "title": "SearchResponse"
+      },
+      "SearchResultItem": {
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Document Id"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "chunk_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Chunk Id"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "similarity_score": {
+            "type": "number",
+            "title": "Similarity Score"
+          },
+          "page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Number"
+          },
+          "heading": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Heading"
+          },
+          "section_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "document_id",
+          "filename",
+          "chunk_id",
+          "content",
+          "similarity_score"
+        ],
+        "title": "SearchResultItem"
+      },
+      "TeamActivitySummary": {
+        "properties": {
+          "total_scans": {
+            "type": "integer",
+            "title": "Total Scans"
+          },
+          "total_findings": {
+            "type": "integer",
+            "title": "Total Findings"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/TeamMemberActivity"
+            },
+            "type": "array",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_scans",
+          "total_findings",
+          "members"
+        ],
+        "title": "TeamActivitySummary",
+        "description": "Org-wide scan-activity aggregation for a Security Manager \u2014 how much\ngot scanned, by whom, what it found. Deliberately not the same thing as\nthe audit log (who changed what) \u2014 see Permission.TEAM_ANALYTICS_READ's\ndocstring."
+      },
+      "TeamMemberActivity": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "total_scans": {
+            "type": "integer",
+            "title": "Total Scans"
+          },
+          "total_findings": {
+            "type": "integer",
+            "title": "Total Findings"
+          },
+          "average_brs_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Brs Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "total_scans",
+          "total_findings"
+        ],
+        "title": "TeamMemberActivity"
+      },
       "TokenResponse": {
         "properties": {
           "access_token": {
@@ -3549,6 +5615,19 @@
           },
           "auth_provider": {
             "$ref": "#/components/schemas/AuthProvider"
+          },
+          "role_display_name": {
+            "type": "string",
+            "title": "Role Display Name",
+            "readOnly": true
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Permissions",
+            "readOnly": true
           }
         },
         "type": "object",
@@ -3557,7 +5636,9 @@
           "email",
           "role",
           "is_active",
-          "auth_provider"
+          "auth_provider",
+          "role_display_name",
+          "permissions"
         ],
         "title": "UserRead"
       },
@@ -3686,6 +5767,90 @@
           "message"
         ],
         "title": "WebhookAckResponse"
+      },
+      "WeekOverWeekDeltaSchema": {
+        "properties": {
+          "scans_this_week": {
+            "type": "integer",
+            "title": "Scans This Week"
+          },
+          "scans_last_week": {
+            "type": "integer",
+            "title": "Scans Last Week"
+          },
+          "findings_this_week": {
+            "type": "integer",
+            "title": "Findings This Week"
+          },
+          "findings_last_week": {
+            "type": "integer",
+            "title": "Findings Last Week"
+          },
+          "average_brs_this_week": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Brs This Week"
+          },
+          "average_brs_last_week": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Brs Last Week"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scans_this_week",
+          "scans_last_week",
+          "findings_this_week",
+          "findings_last_week"
+        ],
+        "title": "WeekOverWeekDeltaSchema"
+      },
+      "WeeklyTrendPointSchema": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "title": "Week Start"
+          },
+          "scan_count": {
+            "type": "integer",
+            "title": "Scan Count"
+          },
+          "average_brs": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Brs"
+          },
+          "critical_high_findings": {
+            "type": "integer",
+            "title": "Critical High Findings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "scan_count",
+          "critical_high_findings"
+        ],
+        "title": "WeeklyTrendPointSchema"
       }
     },
     "securitySchemes": {

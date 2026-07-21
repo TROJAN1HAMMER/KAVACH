@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, RedirectResponse
 
@@ -29,6 +30,7 @@ from app.repositories.scan_job_repository import ScanJobRepository
 from app.schemas.report import ReportPathsResponse, ReportStatusDetail
 from app.services.reports.storage import get_storage
 
+logger = structlog.get_logger(__name__)
 router = APIRouter()
 
 VALID_REPORT_TYPES = [
@@ -83,20 +85,44 @@ async def get_report_status(
     )
 
 
-def _download_response(report: Report, report_type: str):
+def _download_response(report: Report, report_type: str, *, scan_job_id: uuid.UUID):
     media_type = MEDIA_TYPES.get(report_type, "application/octet-stream")
 
     if report.storage_backend == "s3":
         storage = get_storage()
         ref = storage.get_download_reference(report.storage_key)
         if ref.presigned_url is None:
+            logger.error(
+                "reports.presigned_url_failed", scan_job_id=str(scan_job_id), report_type=report_type
+            )
             raise HTTPException(status_code=502, detail="Could not generate a download URL for this report")
+        logger.info(
+            "reports.download_redirect", scan_job_id=str(scan_job_id), report_type=report_type, backend="s3"
+        )
         return RedirectResponse(url=ref.presigned_url, status_code=307)
 
     file_path = Path(report.file_path)
-    if not file_path.exists():
+    file_exists = file_path.exists()
+    logger.info(
+        "reports.file_check",
+        scan_job_id=str(scan_job_id),
+        report_type=report_type,
+        file_path=str(file_path),
+        file_exists=file_exists,
+    )
+    if not file_exists:
+        logger.error(
+            "reports.file_missing", scan_job_id=str(scan_job_id), report_type=report_type, file_path=str(file_path)
+        )
         raise HTTPException(status_code=404, detail="Report file missing on disk")
 
+    logger.info(
+        "reports.download_started",
+        scan_job_id=str(scan_job_id),
+        report_type=report_type,
+        file_path=str(file_path),
+        media_type=media_type,
+    )
     return FileResponse(
         path=file_path,
         media_type=media_type,
@@ -118,11 +144,19 @@ async def download_report(
     streaming the file through this process; for "local" it streams the
     file directly, unchanged from before S3 support existed.
     """
+    logger.info(
+        "reports.download_requested",
+        scan_job_id=str(scan_job_id),
+        report_type=report_type,
+        user_id=str(current_user.id),
+    )
+
     if report_type not in VALID_REPORT_TYPES:
         raise HTTPException(status_code=400, detail="Invalid report type")
 
     report = await reports.get_by_type(scan_job_id, report_type)
     if not report:
+        logger.warning("reports.not_found", scan_job_id=str(scan_job_id), report_type=report_type)
         raise HTTPException(status_code=404, detail=f"{report_type.upper()} report not found for this scan job")
 
     if report.status != "completed":
@@ -131,6 +165,9 @@ async def download_report(
             if report.status == "failed"
             else f"{report_type.upper()} report is still {report.status} — try again shortly"
         )
+        logger.warning(
+            "reports.not_ready", scan_job_id=str(scan_job_id), report_type=report_type, status=report.status
+        )
         raise HTTPException(status_code=409, detail=detail)
 
-    return _download_response(report, report_type)
+    return _download_response(report, report_type, scan_job_id=scan_job_id)

@@ -1,15 +1,17 @@
 # KAVACH 🛡️
 
-**Enterprise AI-Powered DevSecOps Security Platform for Banking & Financial Institutions**
+**An AI-assisted DevSecOps security platform built for banking and financial institutions.**
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Celery](https://img.shields.io/badge/Celery-5.6-37814A?logo=celery&logoColor=white)](https://docs.celeryq.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Helm%20chart-326CE5?logo=kubernetes&logoColor=white)](https://helm.sh/)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows/ci-cd.yaml)
 [![Status](https://img.shields.io/badge/status-active%20development-yellow)]()
 [![License](https://img.shields.io/badge/license-Proprietary-lightgrey)]()
 
@@ -18,115 +20,126 @@
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [Key Features](#key-features)
+- [Features](#features)
 - [Architecture](#architecture)
-- [Technology Stack](#technology-stack)
-- [Folder Structure](#folder-structure)
+- [AI Capabilities](#ai-capabilities)
+- [Role-Based Access Control](#role-based-access-control)
+- [Web + Mobile](#web--mobile)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
 - [Installation](#installation)
-- [Running Locally](#running-locally)
-- [API Documentation](#api-documentation)
-- [Banking Risk Score](#banking-risk-score)
-- [AI Layer](#ai-layer)
-- [Compliance Engine](#compliance-engine)
-- [Dashboard](#dashboard)
-- [Reports](#reports)
-- [Security](#security)
-- [Deployment](#deployment)
+- [Running the Project](#running-the-project)
+- [API](#api)
+- [Screenshots](#screenshots)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
 ## Project Overview
 
-KAVACH is a distributed, AI-augmented DevSecOps security platform purpose-built for banking and financial-services engineering teams. It scans application source repositories for vulnerabilities across nine independent tools, correlates and deduplicates the results, and turns raw findings into the thing a bank actually needs to act on: a quantified, business-aware risk number, mapped to the specific regulatory controls it violates, with an AI-generated explanation of what it means and how to fix it.
+KAVACH is a distributed, AI-assisted DevSecOps platform purpose-built for banking and financial-services engineering teams. It scans application source repositories across nine independent security tools, correlates and deduplicates the results into one unified finding set, and turns that output into what a bank actually needs to act on: a quantified, business-aware risk score, mapped to the specific regulatory controls it violates, with a citation-backed explanation of what it means and how to fix it.
 
-### The problem
+### Why traditional scanners fall short
 
-Traditional DevSecOps tooling stops at the finding. A SAST scanner reports "SQL injection, CVSS 8.2" and moves on. That output is genuinely difficult for a bank to act on at scale:
+A conventional SAST or SCA tool reports "SQL injection, CVSS 8.2" and stops there. That is genuinely difficult for a bank to act on at scale, for four concrete reasons:
 
-- **CVSS alone doesn't reflect business risk.** A CVSS 8.2 in an internal reporting tool is not the same risk as a CVSS 6.5 in the payments-settlement module. Traditional tools have no concept of *which module this is* or *what it's worth to the business*.
-- **Compliance mapping is manual.** Regulators (RBI, PCI-DSS, SWIFT CSP) require evidence that specific controls are met. Mapping a raw scanner finding to "PCI-DSS Requirement 6.2" is normally a spreadsheet exercise done by a human, after the fact.
-- **Findings pile up faster than they can be triaged.** A single scan across nine tools on a real codebase can produce hundreds of raw, overlapping, differently-worded findings for the same underlying issue.
-- **Remediation guidance is generic.** "Use parameterized queries" doesn't tell a developer *where*, *why this specific instance matters*, or *what the business impact of not fixing it is*.
+- **CVSS has no concept of business context.** A CVSS 8.2 in an internal reporting tool is not the same risk as a CVSS 6.5 in the payments-settlement path. Traditional tools cannot express *which module this is* or *what it is worth to the business*.
+- **Compliance mapping is manual.** Regulators (RBI, PCI DSS, SWIFT CSP) require evidence that specific controls are met. Turning a raw scanner finding into "this violates PCI DSS Requirement 6.2" is normally a spreadsheet exercise performed by a human, after the fact.
+- **Findings pile up faster than they can be triaged.** A single scan across nine tools on a real codebase produces hundreds of raw, overlapping, differently-worded findings for the same underlying issue.
+- **Remediation guidance is generic.** "Use parameterized queries" does not tell a developer *where*, *why this specific instance matters*, or *what happens if it isn't fixed*.
 
-KAVACH addresses all four by running scan results through a dedicated **Risk Engine**, **Compliance Engine**, and **AI Layer** before a human ever sees them — turning a pile of raw tool output into a scored, mapped, explained, and prioritized set of findings.
+KAVACH addresses all four by running every scan through a dedicated **Risk Engine**, **Compliance Engine**, and **AI Intelligence Layer** before a human ever sees the results.
 
-### The Banking Risk Score (BRS)
+### Banking Risk Score (BRS)
 
-The BRS is KAVACH's core differentiator. It is a **0–100 blended score**, deliberately *not* a repackaged CVSS number. Each finding is scored as a weighted average across **seven factors** — raw CVSS, exploitability, the criticality of the business module it was found in (payments, authentication, reporting, ...), internet exposure, the number of compliance frameworks it violates, the asset value of the affected module, and historical incident count for that module — configurable per-deployment via `RiskFactorWeight` rows, not hardcoded. See [Banking Risk Score](#banking-risk-score) for the full methodology.
+The BRS is KAVACH's core differentiator: a **0–100 blended score**, deliberately not a repackaged CVSS number. Each finding is scored as a weighted average across **seven factors** — CVSS, exploitability, the criticality of the business module it was found in, internet exposure, the number of compliance frameworks it violates, the asset value of the affected module, and historical incident count for that module. Every factor weight and module definition is stored in Postgres and editable at runtime via the API — none of it is a hardcoded constant. Full methodology below in [Architecture](#architecture) and in `docs/brs_audit_report.md`.
 
-Alongside BRS, KAVACH separately computes a **Zero-Day Risk Score** — a predictive estimate (dependency staleness, known-CVE density, risky package categories, configuration risk, code vulnerability density) of exposure to *undisclosed* vulnerabilities, since a codebase can be BRS-clean today and still be sitting on a ticking dependency-rot problem.
+Why this matters: a CVSS-9.8 SQL injection scores very differently depending on whether it sits in the internet-facing Payments module with two compliance-clause hits and a history of incidents, versus an internal Reporting module nobody else touches. A bare CVSS number cannot express that difference. BRS is what a security team actually triages against.
 
-### How KAVACH differs from traditional DevSecOps tools
+### How KAVACH differs from a stock SAST/SCA pipeline
 
 | | Traditional SAST/SCA tools | KAVACH |
 |---|---|---|
 | Output | Raw findings, per-tool, unranked | Cross-tool deduplicated, BRS-ranked, compliance-mapped findings |
-| Risk scoring | CVSS only | 7-factor business-aware BRS + a separate zero-day prediction |
-| Compliance | Manual mapping after the fact | Deterministic, automatic mapping to RBI/PCI-DSS/SWIFT CSP at scan time |
-| Explanation | Technical description only | AI-generated plain-language explanation + business impact + remediation, cached |
-| Trigger | Manual / CI step | Manual upload, direct URL submission, scheduled nightly rescans, **and** GitHub push webhooks |
-| Execution | Usually a single sequential job | 9 scanners fanned out in parallel across a priority-queued distributed worker pool |
-| Reporting | Whatever one tool emits | 7 report formats (executive PDF, technical PDF, SARIF, CycloneDX SBOM, unified JSON, compliance JSON, CSV) from one scan |
-| Lifecycle | Findings live forever in one flat list | Nightly archive sweep reclaims report artifacts past a retention window; scan/finding history is retained |
+| Risk scoring | CVSS only | 7-factor business-aware BRS + a separate Attack Surface Exposure index |
+| Compliance | Manual mapping after the fact | Deterministic, automatic mapping to RBI / PCI DSS / SWIFT CSP at scan time |
+| Explanation | Technical description only | Automated per-finding explanation, plus an on-demand, citation-backed AI deep-dive |
+| Trigger | Manual / single CI step | Manual upload, direct URL submission, scheduled nightly rescans, and GitHub push webhooks |
+| Execution | Usually one sequential job | 9 scanners fanned out in parallel across a priority-queued distributed worker pool |
+| Reporting | Whatever one tool emits | 7 report formats from a single scan — executive PDF, technical PDF, SARIF, CycloneDX SBOM, unified JSON, compliance JSON, CSV |
+| Access | Web only | Web console and a native Flutter mobile client against the same backend |
 
 ---
 
-## Key Features
+## Features
 
-Every feature below is implemented in the current codebase — none of this is aspirational.
+Every item below exists in the current codebase and is exercised by the platform today.
 
-**Scanning**
-- **Static Code Analysis** — Semgrep (`app/services/scanning/static_scanner.py`) and ast-grep (`ast_grep_scanner.py`) for pattern-based source analysis, plus Joern for deep code-property-graph analysis where available.
-- **Dependency Analysis** — pip-audit-based scanning (`dependency_scanner.py`) against known-vulnerability databases, plus dedicated OSV (`osv_scanner.py`) and NVD (`nvd_scanner.py`) lookups.
-- **Configuration Scanning** — YAML/config-file misconfiguration detection (`yaml_scanner.py`, `config_scanner.py`).
-- **Secret Detection** — hardcoded credential/key/token scanning (`secrets_scanner.py`).
-- **Container/Docker Scanning** — Dockerfile and image configuration analysis (`docker_scanner.py`).
-- **Supply Chain Security** — CycloneDX SBOM generation for every scan, cross-referenced with dependency findings.
-- **Cross-Tool Aggregation** — a dedicated aggregation layer (`app/services/aggregation/`) correlates and deduplicates findings reported by *multiple* tools for the same underlying issue, rather than fingerprinting per-source.
+### Static Code Analysis
+Semgrep (custom rule pack, with a regex-based fallback if the binary is unavailable) and ast-grep run independent, structurally-different SAST passes over the same source tree — hardcoded secrets, SQL/command injection, weak cryptography, unsafe deserialization, path traversal, and insecure randomness — deliberately overlapping so one tool's blind spot doesn't become a silent gap. Where a Joern installation is available, a third pass performs code-property-graph reachability analysis from dangerous sinks (`exec`, `eval`, `pickle.loads`, `unserialize`) back to untrusted input.
 
-**Risk & Compliance**
-- **Banking Risk Score (BRS)** — 7-factor, business-aware, per-finding and per-scan risk scoring (`app/services/risk/brs_engine.py`).
-- **Zero-Day Risk Prediction** — a separate predictive score for undisclosed-vulnerability exposure (`app/services/risk/zero_day_predictor.py`).
-- **Compliance Mapping** — deterministic per-finding mapping to RBI IT Framework 2021, PCI-DSS v4.0, and SWIFT CSP clauses (`app/services/compliance/compliance_mapper.py`), plus scan-level control-by-control PASS/FAIL evaluation (`compliance_engine.py`).
-- **Configurable Risk Modules** — business-module criticality/asset-value weighting and per-factor BRS weights are stored in Postgres and editable via API (`app/api/v1/endpoints/risk_config.py`), not hardcoded constants.
+### Dependency Vulnerability Analysis
+Three independent lookups feed the same aggregation layer: **pip-audit** against known-vulnerability databases, a direct **OSV.dev** batch query, and an **NVD** CVE keyword search (rate-limited, treated explicitly as *leads worth triaging*, not confirmed hits). Running three sources instead of one catches vulnerabilities that any single database has not yet indexed.
 
-**AI**
-- **AI-Powered Security Explanations** — plain-language, business-context explanations of each finding.
-- **AI Remediation Suggestions** — concrete, actionable fix guidance per finding.
-- **Multi-provider AI Gateway** — Claude, OpenAI, and Gemini (cloud) plus Ollama and vLLM (self-hosted/local), selectable via a single `AI_MODE` setting (`app/services/ai/gateway.py`).
-- **Response Caching & Template Fallback** — a semantic cache avoids re-explaining near-identical findings, and a rule-based template library provides zero-cost explanations when no AI provider is configured or reachable.
-- **On-demand Streaming Explanations** — a Server-Sent-Events endpoint streams a live AI explanation for a single finding.
+### Configuration & Infrastructure Security
+A structural YAML analyzer inspects Kubernetes manifests (`hostNetwork`, `privileged`, missing resource limits, wildcard RBAC, plaintext secrets in `env`), Docker Compose files, and GitHub Actions workflows (untrusted `${{ github.event... }}` interpolation into `run:` steps, `pull_request_target` misuse). A companion Dockerfile analyzer flags unpinned base images, dangerous `EXPOSE` ports, missing `USER`/`HEALTHCHECK` instructions, and secrets baked into `ENV`/`ARG`.
 
-**Orchestration & Execution**
-- **Async Scan Execution** — every scan runs asynchronously against a Celery-backed job queue; the submitting request returns immediately.
-- **Queue-based Processing** — priority-queued distributed workers (`kavach.critical`/`kavach.high`/`kavach.normal`/`kavach.low`), with 9 scanners fanned out in parallel per scan via a Celery chord.
-- **Multi-scan Support** — repository URL submission, direct `.zip` upload, and pre-bundled sandbox payloads.
-- **GitHub Webhook Intake** — HMAC-verified inbound webhook (`app/api/v1/endpoints/webhooks.py`) that automatically queues a scan on `push` events.
-- **Scheduled Rescans** — nightly Celery Beat sweep re-scans any repository opted in to scheduled scanning.
-- **Real-time Status Updates** — a WebSocket endpoint streams live per-scanner and job-level progress to the dashboard as a scan runs; polling REST endpoints are available as a fallback.
-- **Stalled-job Detection** — a periodic sweep detects and retries/fails jobs whose worker died without raising.
-- **Archive Sweep** — a nightly job reclaims report artifacts (not scan/finding history) past a configurable retention window.
+### Secret Detection
+An in-house, gitleaks-style regex engine detects AWS keys, GitHub/GitLab/NPM tokens, Slack tokens and webhooks, Google API keys, Stripe keys, private-key blocks, JWTs, and credentials embedded in URLs — no external binary dependency.
 
-**Reporting & Dashboard**
-- **Report Generation** — PDF (executive + technical), SARIF, CycloneDX SBOM, unified findings JSON, compliance report JSON, and CSV, generated asynchronously per scan.
-- **Repository Management** — a persistent repository list, decoupled from any single scan, with per-repository scheduled-scan opt-in.
-- **Risk Trends** — portfolio-wide BRS trend charts and per-repository risk history.
-- **Dashboard & Analytics** — a full React SPA (Repositories, Scan Queue, Risk Dashboard, Compliance Dashboard, Finding Explorer, Executive Summary) with dark/light theming.
-- **Notifications** — Slack, email (SMTP), and generic HMAC-signed webhook notifications on scan completion/failure and stalled-worker detection.
+### Supply Chain Analysis
+Every scan generates a **CycloneDX SBOM**, cross-referenced against the dependency-scan findings and fed into the Attack Surface Exposure index below.
 
-**Platform**
-- **Enterprise Authentication** — JWT access/refresh tokens, local email/password auth, OAuth2/OIDC and LDAP SSO (SAML scaffolded, pending an XML security toolkit), 5-role RBAC.
-- **Observability** — Prometheus metrics, OpenTelemetry distributed tracing, structured JSON logging correlated with trace IDs, 3 pre-built Grafana dashboards, and Alertmanager rules.
-- **OpenAPI Documentation** — a fully-tagged, described OpenAPI 3 schema, exportable via `scripts/generate_openapi.py`.
+### Cross-Tool Aggregation
+A dedicated aggregation engine correlates findings across all nine tools for the same underlying issue — matching on shared CVE + package, then file + line + category, then file + category + title — before scoring, rather than treating each tool's output as independent. The result is one deduplicated, enriched `UnifiedFinding` set per scan, tagged with every source tool that flagged it and a merged CWE/OWASP/MITRE ATT&CK taxonomy.
+
+### Banking Risk Score (BRS)
+Described above — a 7-factor, business-aware, per-finding and per-scan risk score with fully configurable weights and business-module definitions.
+
+### Attack Surface Exposure
+A separate, independent 0–100 composite index — dependency count, known-CVE density, dependency staleness, risky package categories, configuration risk, and code vulnerability density — that measures exposure to *undisclosed* vulnerabilities rather than scoring what's already been found. It is explicitly documented as a heuristic exposure index, not a prediction of any specific future exploit, and does not feed into BRS: a codebase can be BRS-clean today and still be sitting on a dependency-rot problem.
+
+### AI-Assisted Security Intelligence
+Two complementary AI subsystems, detailed in [AI Capabilities](#ai-capabilities): an always-on explanation engine that annotates every finding automatically as part of the scan pipeline, and a retrieval-augmented (RAG) knowledge layer — AI Assistant chat, per-finding Intelligence, and Executive Intelligence — that answers open-ended questions with citation-backed, confidence-scored evidence pulled from an uploaded knowledge base and the platform's own scan history.
+
+### Regulatory Compliance Mapping
+Deterministic, rule-based mapping of every finding to the specific clauses it violates across **PCI DSS v4.0**, the **RBI IT Framework (2021)**, and the **SWIFT Customer Security Programme**, plus a full control-by-control PASS/FAIL evaluation per framework. Control definitions live in YAML, not code — adding or amending a rule is a configuration change. These are KAVACH's own illustrative mappings from finding category to published control text, useful for continuous self-assessment and evidence-gathering — they are not a certified PCI QSA, RBI, or SWIFT CSP attestation, and should not be presented to a regulator as one without independent review.
+
+### Executive Reports
+A business-facing PDF summarizing BRS, risk level, compliance posture, and top findings, generated asynchronously for every completed scan.
+
+### Technical Reports
+A full-detail PDF listing every finding with its complete CWE/OWASP/MITRE taxonomy, CVSS/BRS, source tools, and remediation — for engineering teams, alongside SARIF (IDE/CI integration), CycloneDX SBOM, unified findings JSON, compliance JSON, and CSV exports.
+
+### Interactive Architecture Visualization
+A 3D, explorable system-architecture diagram (React Three Fiber) available both publicly (no login required, for evaluators and recruiters) and inside the authenticated dashboard — click any component to fly the camera to it and see its purpose, inputs/outputs, and a sample API call.
+
+### Role-Based Access Control (RBAC)
+Five backend-enforced roles spanning administration, security operations, engineering, and executive oversight — see [Role-Based Access Control](#role-based-access-control).
+
+### Audit Logging
+Every authentication attempt (success and failure), role change, and administrative action is persisted to Postgres with actor, IP address, and outcome, queryable via a dedicated audit-log endpoint gated to roles holding `audit_log:read`.
+
+### Flutter Mobile Application
+A native Android/iOS client (`mobile/`) built with Flutter and Riverpod, consuming the identical FastAPI backend and RBAC model as the web console — see [Web + Mobile](#web--mobile).
+
+### Cloud-Native Deployment
+A production Helm chart (21 templates) covering Deployments, StatefulSets, autoscaling, pod-disruption budgets, network policies, ingress, and a pre-install migration job, plus a rendered plain-manifest snapshot under `k8s/` for teams that want `kubectl apply`-able YAML without Helm.
+
+### REST API
+Every route versioned under `/api/v1`, fully described in an OpenAPI 3 schema served live at `/docs` and `/redoc`.
+
+### Modular Scanner Architecture
+Each of the nine scanners is an independent Celery task that catches its own failures and always returns a result — one missing tool (for example, no local Joern install) degrades gracefully rather than blocking the pipeline. New scanners plug into the same fan-out/aggregation contract without touching existing ones.
 
 ---
 
 ## Architecture
 
-KAVACH is a distributed, queue-driven pipeline. A scan can enter the system from three places — a user submitting a URL/archive through the API, the React dashboard, or a verified GitHub push webhook — and all three converge on the same orchestration path.
+A scan can enter the system from three places — a user submitting a URL/archive through the API or dashboard, or a verified GitHub push webhook — and all three converge on the same orchestration path. The AI/RAG layer and the two client applications sit alongside this pipeline rather than inside it: they read from the same Postgres tables the pipeline writes to.
 
 ```mermaid
 flowchart TD
@@ -136,19 +149,25 @@ flowchart TD
     D --> E["Redis Queue<br/>(priority: critical / high / normal / low)"]
     E --> F["Distributed Workers<br/>(9 scanners fanned out in parallel)"]
     F --> G["Aggregation Layer<br/>(cross-tool dedup & correlation)"]
-    G --> H["Business Logic<br/>(Banking Risk Score + Zero-Day prediction)"]
-    H --> I["AI Layer<br/>(explanation · business impact · remediation)"]
-    I --> J["Compliance Engine<br/>(RBI · PCI-DSS · SWIFT CSP mapping)"]
+    G --> H["Risk Engine<br/>(Banking Risk Score + Attack Surface Exposure)"]
+    H --> I["Automated Finding Explanations<br/>(multi-provider AI gateway)"]
+    I --> J["Compliance Engine<br/>(RBI · PCI DSS · SWIFT CSP mapping)"]
     J --> K["Report Generation<br/>(PDF · SARIF · SBOM · JSON · CSV)"]
-    K --> L["Dashboard<br/>(React — Risk, Compliance, Findings, Executive)"]
-    H --> M["Notifications<br/>(Slack · Email · Webhook)"]
-    K --> N["Archive Sweep<br/>(nightly report-artifact reclamation)"]
+    K --> L["Web Dashboard (React)"]
+    K --> M["Mobile App (Flutter)"]
+    H --> N["Notifications<br/>(Slack · Email · Webhook)"]
+
+    P["Knowledge Base<br/>(uploaded docs → chunk → embed → pgvector)"] --> Q["RAG Layer<br/>(AI Assistant · Finding Intelligence · Executive Intelligence)"]
+    G -.scan history.-> Q
+    Q --> L
+    Q --> M
 
     style A fill:#2a78d6,color:#fff
     style E fill:#e34948,color:#fff
     style H fill:#eda100,color:#000
     style I fill:#4a3aa7,color:#fff
     style J fill:#1baf7a,color:#fff
+    style Q fill:#4a3aa7,color:#fff
 ```
 
 ### Scan lifecycle, in detail
@@ -174,10 +193,10 @@ sequenceDiagram
     Queue->>Agg: chord callback — aggregate_scan_results
 
     Agg->>Agg: cross-tool dedup & correlation
-    Agg->>Agg: Banking Risk Score + Zero-Day prediction
-    Agg->>AI: batch finding insight generation
+    Agg->>Agg: Banking Risk Score + Attack Surface Exposure
+    Agg->>AI: batch finding explanation generation
     AI-->>Agg: explanation, business impact, remediation
-    Agg->>Agg: compliance mapping (RBI/PCI-DSS/SWIFT)
+    Agg->>Agg: compliance mapping (RBI/PCI DSS/SWIFT)
     Agg->>DB: persist Findings + ScanResult, mark job completed
     Agg->>Queue: dispatch report generation (async)
     Agg->>Client: WebSocket progress + notification (Slack/Email/Webhook)
@@ -186,9 +205,93 @@ sequenceDiagram
     Client->>API: GET /reports/{id}/download/{type}
 ```
 
+### Layer responsibilities
+
+| Layer | Responsibility |
+|---|---|
+| **Frontend** (React + Vite) | Full-featured web console — every dashboard, the AI Assistant panel, knowledge-base management, admin user management, and the public + authenticated 3D architecture explorer |
+| **Flutter Mobile Client** | On-the-go companion — session/RBAC-aware navigation, repositories, scan submission and status, dashboard analytics, against the same API |
+| **FastAPI Backend** | REST + WebSocket gateway, auth/RBAC enforcement, request routing to every service below |
+| **PostgreSQL (+ pgvector)** | System of record for repositories, scans, findings, users, audit log, and vector-embedded knowledge-base chunks |
+| **Redis** | Celery broker/result backend, per-scanner live status, rate-limit counters, AI response/embedding/rerank caches |
+| **Scanner Engine** | The 9 fanned-out Celery tasks producing raw, per-tool findings |
+| **Aggregation Layer** | Cross-tool correlation, deduplication, and enrichment into unified findings |
+| **Risk Engine** | Banking Risk Score and Attack Surface Exposure scoring |
+| **Compliance Engine** | YAML-driven control catalog evaluation against RBI / PCI DSS / SWIFT CSP |
+| **AI Layer** | Automated per-finding explanations (pipeline-embedded) *and* the RAG-based Assistant / Finding Intelligence / Executive Intelligence surfaces (on-demand) |
+| **Report Generator** | Asynchronous rendering of all 7 report formats, storage-backend agnostic (local disk or S3/MinIO) |
+
 ---
 
-## Technology Stack
+## AI Capabilities
+
+KAVACH's AI is a strictly explanatory and evidentiary layer. Stated precisely, because it matters for a banking context:
+
+> **AI never calculates a security score. AI never changes a finding. AI only explains, summarizes, retrieves evidence, and assists a human who is still the one deciding what to do.**
+
+This is enforced structurally, not just by convention: the AI service layers only ever *read* `Finding`/`ScanJob` rows to build a prompt — none of them ever commit back to the database, and BRS/CVSS/Attack-Surface-Exposure scoring runs entirely in the Risk Engine, a separate code path the AI layer never calls into.
+
+There are two distinct AI subsystems, addressing two different needs.
+
+### 1. Automated finding explanations (pipeline-embedded)
+
+Every finding gets an explanation automatically, with no user interaction required, as part of the aggregation step. A provider-agnostic gateway (`app/services/ai/gateway.py`) resolves cloud (Claude, OpenAI, Gemini) and local/self-hosted (Ollama, vLLM) providers via a single `AI_MODE` setting (`hybrid` by default — local first, cloud fallback), calling every provider over plain REST with no vendor SDK dependency. A semantic cache avoids re-explaining near-identical findings, and a rule-based template library provides a deterministic, zero-cost explanation whenever no provider is configured or reachable — a scan's completion is never blocked on AI availability.
+
+### 2. Retrieval-Augmented Generation (RAG) knowledge layer
+
+This is where an operator can ask KAVACH open-ended questions and get answers grounded in real, retrievable evidence rather than the model's own memory. Three interactive surfaces share one pipeline:
+
+```mermaid
+flowchart LR
+    A["User question<br/>(chat / finding / executive)"] --> B["Retrieve<br/>pgvector cosine search, top 20"]
+    B --> C["Rerank<br/>cross-encoder, top 5"]
+    C --> D{"Confidence gate<br/>sigmoid-normalized rerank score"}
+    D -- below threshold --> E["Refuse / deterministic fallback<br/>never calls the LLM"]
+    D -- above threshold --> F["Grounded generation<br/>LLM sees ONLY the retrieved chunks"]
+    F --> G["Response + citations<br/>document · page · section · similarity score"]
+    E --> G
+
+    style D fill:#eda100,color:#000
+    style E fill:#e34948,color:#fff
+    style F fill:#4a3aa7,color:#fff
+```
+
+- **Knowledge Base** — an administrator uploads PDF, Markdown, or plain-text reference material (OWASP guides, internal policy, regulatory text). Each document is deduplicated by content hash (an exact re-upload is rejected, not silently re-indexed), version-chained by filename, chunked with heading/section/page-aware splitting, and embedded locally with an ONNX model (`BAAI/bge-small-en-v1.5`, no external API call) into a Postgres/pgvector index.
+- **AI Assistant** — a chat panel that retrieves the top 20 chunks by cosine similarity, reranks them with a local cross-encoder (`Xenova/ms-marco-MiniLM-L-6-v2`) down to the top 5, and only generates an answer if the reranked confidence clears a threshold. Below it, KAVACH returns a fixed message stating it could not find sufficient information — it never falls back to the model's general knowledge. Every answer streams with its supporting citations, a confidence score, retrieved-document count, and latency.
+- **Finding Intelligence** — opening a finding runs the same retrieve → rerank → confidence-gate pipeline against the knowledge base to produce a plain-English explanation, business impact, technical impact, recommended remediation, verification steps, and a code example — all citation-backed. The deterministic facts (CWE, OWASP category, MITRE ATT&CK technique, RBI/PCI/SWIFT clause) come directly from KAVACH's own aggregation engine and are always shown, whether or not the generative gate passes; the narrative fields simply stay empty (with an explicit "not grounded" note) if it doesn't.
+- **Executive Intelligence** — answers portfolio-level questions ("What are our biggest risks?", "What changed this week?") grounded first in a deterministic snapshot computed directly from scan history (no LLM involved in the numbers themselves), with knowledge-base retrieval as a secondary evidence source. Exportable to PDF.
+- **Production hardening** — Redis-backed response and embedding caching, per-user per-endpoint rate limiting, search analytics, a feedback-collection endpoint, a benchmarking endpoint, and extended `/health/ready` checks for the vector index, embedding model, and rerank model.
+
+**What KAVACH does not ship out of the box:** reference material. The deterministic CWE/OWASP/MITRE/compliance identifiers on every finding come from KAVACH's own scanning and compliance engines regardless of what's in the knowledge base — but the narrative, citation-backed explanations only populate once an administrator has uploaded the source documents to ground them in.
+
+---
+
+## Role-Based Access Control
+
+KAVACH enforces five roles at the backend — both a coarse middleware (blocking any mutating request from a read-only-shaped role outright) and fine-grained per-route permission checks. The web and mobile clients use the same role table purely to hide navigation a role can't use; it is a UX convenience, never the actual security boundary.
+
+| Role | Display name | Typical use |
+|---|---|---|
+| `admin` | **Administrator** | Full platform access: user/role management, risk configuration, all scanning and reporting capability |
+| `security_engineer` | **Security Manager** | Runs and triages scans, manages risk configuration, reads the audit log and team-wide analytics |
+| `developer` | **Security Analyst** | Submits scans, reads findings and compliance results, uses the AI Assistant and knowledge base |
+| `auditor` | **Executive / Board Member** | Read-only access to risk, compliance, and executive reporting — no scan submission |
+| `read_only` | **Read Only** | The self-registration default and minimal-viewer fallback — scan/report visibility only |
+
+---
+
+## Web + Mobile
+
+KAVACH ships two client applications, and both consume the exact same `/api/v1` FastAPI backend, the same JWT/RBAC model, and the same data — there is no mobile-specific API and no feature that exists only for one client by design.
+
+- **Web platform** (`frontend/`) — the full-featured console: every dashboard, the AI Assistant and knowledge-base management, RAG operations/benchmarking, admin user management, and the public + authenticated 3D architecture explorer. This is where compliance officers, security engineers, and administrators do deep work.
+- **Flutter mobile application** (`mobile/`) — a native Android/iOS companion for checking on things away from a desk: dashboard analytics, repository and scan-queue status, starting a scan, and viewing scan/risk detail, gated by the same backend-issued role and permissions. Screens the backend does not yet have a matching endpoint for (cross-scan finding/compliance rollups, a notifications inbox, self-service profile editing) ship as clearly-labeled placeholders rather than fabricated data — see `mobile/docs/backend_gaps.md`.
+
+Both are independent, freely deployable clients against one backend — a security engineer can triage a scan on the web console and a manager can check the same scan's BRS from their phone, both reading from the same `ScanJob` row.
+
+---
+
+## Tech Stack
 
 ### Frontend
 
@@ -201,9 +304,21 @@ sequenceDiagram
 | React Router | 7.18 | Client-side routing, route-level code splitting |
 | TanStack React Query | 5.101 | Server-state data fetching/caching |
 | Recharts | 3.8 | Charts (BRS trend, severity distribution, compliance) |
+| three.js / @react-three/fiber / drei | 0.185 / 9.6 / 10.7 | The 3D architecture explorer |
 | Axios | 1.18 | HTTP client with JWT refresh interceptor |
 | Framer Motion | 12.40 | Animation |
 | Lucide React | 1.21 | Icons |
+
+### Mobile
+
+| Technology | Purpose |
+|---|---|
+| Flutter | Cross-platform (Android/iOS) client framework |
+| Riverpod | State management and dependency injection |
+| Dio | HTTP client, with a JWT auth/refresh interceptor mirroring the web client's |
+| go_router | Declarative routing with backend-role-aware redirects |
+| Freezed / json_serializable | Typed models generated to mirror backend Pydantic schemas field-for-field |
+| flutter_secure_storage | Encrypted token persistence for session restore |
 
 ### Backend
 
@@ -213,7 +328,7 @@ sequenceDiagram
 | FastAPI | 0.139 | API framework |
 | Uvicorn | 0.51 | ASGI server |
 | SQLAlchemy | 2.0 (async) | ORM |
-| Alembic | 1.18 | Database migrations (9 revisions) |
+| Alembic | 1.18 | Database migrations |
 | Pydantic | 2.13 | Schema validation |
 | Celery | 5.6 | Distributed task queue |
 | structlog | 26.1 | Structured JSON logging |
@@ -223,92 +338,102 @@ sequenceDiagram
 | reportlab | 5.0 | PDF report generation |
 | boto3 | 1.43 | S3/MinIO report storage |
 
-### Database & Queue
+### Database & Caching
 
 | Technology | Version | Purpose |
 |---|---|---|
 | PostgreSQL | 16 | Primary datastore |
+| pgvector | — | Vector similarity search for the knowledge-base embeddings (HNSW index) |
 | asyncpg | 0.31 | Async Postgres driver |
-| Redis | 7 | Celery broker/result backend, per-scanner live status |
+| Redis | 7 | Celery broker/result backend, per-scanner live status, rate limiting, AI/embedding/rerank caches |
 
-### AI
+### AI / RAG
 
-| Provider | Mode | Notes |
-|---|---|---|
-| Anthropic Claude | Cloud | via plain REST (`httpx`), no SDK dependency |
-| OpenAI | Cloud | GPT-4o-mini class models |
-| Google Gemini | Cloud | Gemini 1.5 Flash class models |
-| Ollama | Local/self-hosted | Llama 3, Mistral, Phi-3, Mixtral tags validated |
-| vLLM | Local/self-hosted | OpenAI-compatible local inference server |
-
-Provider order is resolved by `AI_MODE` (`hybrid` default — local first, cloud fallback; `cloud`; or `local`), with a semantic cache and rule-based template fallback so the platform degrades gracefully with no provider configured at all.
-
-### Infrastructure
-
-| Technology | Purpose |
+| Component | Detail |
 |---|---|
-| Docker / Docker Compose | Local multi-service stack (Postgres, Redis, API, 2 worker pools, beat, Flower, frontend) |
-| Kubernetes (Helm chart) | Production deployment — 21 templates covering Deployments, StatefulSets, HPA, PDB, NetworkPolicy, Ingress, migration Job |
-| Prometheus / Grafana | Metrics + 3 pre-built dashboards (API, Celery, Risk Trend) |
-| OpenTelemetry | Distributed tracing (OTLP gRPC exporter) |
-| Alertmanager | 7 alert rules (error rate, latency, backlog, scanner failures, disk, beat down) |
-| Flower | Celery task/worker monitoring UI |
+| Cloud LLM providers | Anthropic Claude, OpenAI, Google Gemini — plain REST via `httpx`, no vendor SDK |
+| Local/self-hosted LLM providers | Ollama, vLLM (OpenAI-compatible local inference) |
+| Embedding model | `BAAI/bge-small-en-v1.5` via `fastembed` — local ONNX inference, no GPU/torch dependency |
+| Reranker | `Xenova/ms-marco-MiniLM-L-6-v2` cross-encoder, also via `fastembed` |
+| Vector store | PostgreSQL + `pgvector` (HNSW) |
 
-### Security
+### Authentication
 
 | Mechanism | Implementation |
 |---|---|
-| Authentication | JWT access + refresh tokens, local email/password |
-| SSO | OAuth2/OIDC (generic, any standards-compliant IdP), LDAP (real bind+search) |
-| RBAC | 5 roles — admin, auditor, developer, security_engineer, read_only |
-| Rate limiting | Redis fixed-window limiter, per-IP |
-| Webhook verification | HMAC-SHA256 (`X-Hub-Signature-256` inbound, `X-KAVACH-Signature` outbound) |
-| Audit logging | Every auth event and mutating admin action logged to Postgres |
+| JWT | Access (short-lived) + refresh (long-lived) tokens, HS256 |
+| Local auth | Email/password via bcrypt |
+| SSO | OAuth2/OIDC (any standards-compliant IdP), LDAP (real bind + search); SAML routes exist but return 503 pending an XML-security toolkit dependency |
+| RBAC | 5 roles, enforced by middleware + per-route permission checks |
 
-### Testing
+### Visualization
 
 | Tool | Purpose |
 |---|---|
-| pytest / pytest-asyncio | Test runner |
-| `tests/test_brs_engine.py` | 29 pure-function unit tests for BRS scoring |
-| `tests/integration/` | 9 integration tests against real Postgres/Redis/Celery — full pipeline, webhook intake, archive sweep |
-| ESLint / TypeScript compiler | Frontend static analysis |
+| Recharts | BRS trend, severity distribution, and compliance charts (web) |
+| fl_chart | Equivalent charting on the Flutter mobile client |
+| react-three-fiber / drei | The interactive 3D architecture explorer |
+| Grafana | 3 pre-built dashboards — API, Celery, Risk Trend |
+
+### Deployment / CI/CD
+
+| Tool | Purpose |
+|---|---|
+| Docker / Docker Compose | Local multi-service stack (Postgres, Redis, API, 2 worker pools, beat, Flower, frontend) |
+| Kubernetes (Helm chart) | Production deployment — 21 templates covering Deployments, StatefulSets, HPA, PDB, NetworkPolicy, Ingress, migration Job |
+| GitHub Actions | `backend-test` (pytest), `helm-validate` (helm lint + template), `build-backend`/`build-frontend` (Docker images to GHCR), `deploy` (Helm upgrade, gated to `main`) |
+| Prometheus / Alertmanager | Metrics + 7 alert rules (error rate, latency, backlog, scanner failures, disk, beat down) |
+| OpenTelemetry | Distributed tracing (OTLP gRPC exporter) |
+| Flower | Celery task/worker monitoring UI |
 
 ---
 
-## Folder Structure
+## Project Structure
 
 ```text
 kavach-uco/
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/
-│   │   │   ├── endpoints/        # scan.py, reports.py, repositories.py, risk_config.py, webhooks.py
+│   │   │   ├── endpoints/        # scan, reports, repositories, risk_config, webhooks,
+│   │   │   │                     # knowledge, assistant, finding_intelligence,
+│   │   │   │                     # executive_intelligence, rag_operations, analytics
 │   │   │   └── router.py         # aggregates every v1 router
-│   │   ├── auth/                 # router, sso_router, admin_router, dependencies, permissions, security, service
-│   │   │   └── sso/              # oauth2_provider.py, ldap_provider.py, saml_provider.py
+│   │   ├── auth/                 # router, sso_router, admin_router, dependencies,
+│   │   │   │                     # permissions, security, service
+│   │   │   └── sso/               # oauth2_provider.py, ldap_provider.py, saml_provider.py
 │   │   ├── core/                 # logging, metrics, telemetry, error_handlers, exceptions
 │   │   ├── data/                 # compliance_rules/*.yaml, compliance_mappings.json
 │   │   ├── db/                   # async engine/session, base, mixins
 │   │   ├── integrations/         # github/, gitlab/, bitbucket/ repo-download clients
 │   │   ├── middleware/           # metrics, permission, rate_limit, request_context
-│   │   ├── models/                # SQLAlchemy models (repository, scan_job, finding, scan_result, report, user, ...)
+│   │   ├── models/                # SQLAlchemy models — repository, scan_job, finding,
+│   │   │                          # scan_result, report, user, knowledge_document, ...
 │   │   ├── orchestrator/         # Redis-backed per-scanner status store
 │   │   ├── repositories/          # data-access layer per model
 │   │   ├── schemas/               # Pydantic request/response DTOs
 │   │   ├── services/
 │   │   │   ├── aggregation/       # cross-tool dedup/correlation engine
-│   │   │   ├── ai/                # gateway, providers/ (claude/openai/gemini/ollama/vllm), cache, templates
+│   │   │   ├── ai/                # gateway, providers/ (claude/openai/gemini/ollama/vllm),
+│   │   │   │                      # cache, templates
+│   │   │   ├── assistant/         # RAG-grounded chat pipeline
+│   │   │   ├── finding_intelligence/ # RAG-grounded per-finding deep-dive
+│   │   │   ├── executive_intelligence/ # evidence-grounded executive Q&A
+│   │   │   ├── knowledge_base/    # ingestion, chunking, embedding, vector store
+│   │   │   ├── search_analytics/  # RAG search analytics
+│   │   │   ├── feedback/          # RAG feedback collection
+│   │   │   ├── benchmark/         # RAG benchmark suite
 │   │   │   ├── audit/             # audit log writer
 │   │   │   ├── compliance/        # compliance_engine, compliance_mapper, rule_loader
 │   │   │   ├── notifications/     # slack, email, webhook providers + notification_service
 │   │   │   ├── reports/           # report_generator, storage (local/S3)
-│   │   │   ├── risk/              # brs_engine, zero_day_predictor
+│   │   │   ├── risk/              # brs_engine, attack_surface_exposure
 │   │   │   └── scanning/          # 9 scanner integrations + aggregator
-│   │   ├── tasks/                 # Celery tasks: scan, scanner, aggregator, report, maintenance, scheduled_scan, archive
+│   │   ├── tasks/                 # Celery tasks: scan, scanner, aggregator, report,
+│   │   │                          # maintenance, scheduled_scan, archive
 │   │   ├── workers/                # celery_app.py — queues, beat schedule
 │   │   └── main.py                 # FastAPI app, middleware, lifespan
-│   ├── alembic/versions/           # 9 migrations
+│   ├── alembic/versions/           # database migrations
 │   ├── scripts/generate_openapi.py
 │   ├── tests/
 │   │   ├── test_brs_engine.py
@@ -319,22 +444,43 @@ kavach-uco/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── architecture/scene3d/ # the 3D architecture explorer
 │   │   │   ├── charts/             # BrsTrendChart, SeverityDistributionChart, ComplianceBarChart
 │   │   │   ├── layout/             # AppShell, Sidebar, Topbar, ProtectedRoute, ThemeToggle
 │   │   │   ├── scans/              # NewScanModal, ScanDetailPanel, FindingDetailModal
 │   │   │   └── ui/                 # Button, Card, Badge, Table, Modal, StatTile, ...
-│   │   ├── contexts/                # AuthContext, ThemeContext
-│   │   ├── hooks/                   # useAuth, useTheme, useScanJobs, useFindings, useScanProgressSocket, ...
+│   │   ├── contexts/                # AuthContext, ThemeContext, ToastContext
+│   │   ├── hooks/                   # useAuth, useTheme, useScanJobs, useFindings,
+│   │   │                            # useScanProgressSocket, usePermissions, ...
 │   │   ├── lib/api/                  # axios client + per-resource API modules
-│   │   ├── pages/                    # Repositories, ScanQueue, Risk, Compliance, FindingExplorer, Executive, Login
+│   │   ├── lib/rbac.ts                # client-side route/role table (UX gate only)
+│   │   ├── pages/                    # Repositories, ScanQueue, Risk, Compliance,
+│   │   │                             # FindingExplorer, Executive, Knowledge, Assistant,
+│   │   │                             # RagOperations, Architecture, Login
 │   │   └── types/api.ts               # shared TypeScript contracts mirroring backend schemas
 │   ├── Dockerfile
 │   └── package.json
+├── mobile/
+│   ├── lib/
+│   │   ├── core/                     # theme, rbac, network (Dio client + JWT interceptor), router
+│   │   ├── models/                    # freezed/json_serializable models mirroring backend schemas
+│   │   ├── services/                  # one class per backend router — raw HTTP calls
+│   │   ├── repositories/              # domain layer over services, normalized error handling
+│   │   ├── providers/                 # Riverpod state (auth, lists, feature data)
+│   │   ├── screens/                   # Splash, Landing, Login, Signup, Dashboard, Repositories,
+│   │   │                              # Scans, Risk, Findings, Compliance, Reports, Executive,
+│   │   │                              # Architecture, Notifications, Profile, Settings, About
+│   │   └── widgets/                   # shared UI components, layout shell
+│   ├── docs/backend_gaps.md            # endpoints the mobile app needs that don't exist yet
+│   └── pubspec.yaml
+├── docs/                                # RAG milestone design docs + BRS audit report
 ├── helm/kavach/
-│   ├── templates/                    # 21 templates — Deployments, StatefulSets, HPA, PDB, NetworkPolicy, Ingress, ...
+│   ├── templates/                    # 21 templates — Deployments, StatefulSets, HPA, PDB,
+│   │                                 # NetworkPolicy, Ingress, migration Job, ...
 │   ├── dashboards/                    # Grafana dashboard JSON (API, Celery, Risk Trend)
 │   └── values.yaml
-├── k8s/                                # rendered manifest snapshots
+├── k8s/                                # rendered manifest snapshot (reference only — Helm is the source of truth)
+├── .github/workflows/ci-cd.yaml        # test, lint, build, deploy pipeline
 └── README.md
 ```
 
@@ -346,7 +492,8 @@ kavach-uco/
 
 - Python 3.11+
 - Node.js 20+
-- PostgreSQL 16 (or use the provided Docker Compose service)
+- Flutter 3.24+ (only if building the mobile app)
+- PostgreSQL 16 with the `pgvector` extension (or use the provided Docker Compose service)
 - Redis 7 (or use the provided Docker Compose service)
 - Docker + Docker Compose (recommended for local development)
 
@@ -357,7 +504,7 @@ git clone https://github.com/TROJAN1HAMMER/KAVACH.git
 cd KAVACH
 ```
 
-### Backend setup
+### Backend
 
 ```bash
 cd backend
@@ -365,23 +512,31 @@ python -m venv venv
 source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env       # then edit .env — see Environment variables below
-alembic upgrade head       # apply all 9 migrations
+alembic upgrade head       # apply all migrations
 ```
 
-### Frontend setup
+### Frontend
 
 ```bash
 cd frontend
 npm install
 ```
 
-### Redis
+### Flutter Mobile
 
-Either run the Docker Compose service (below) or point `REDIS_URL` in `.env` at any Redis 7 instance.
+```bash
+cd mobile
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs   # generate typed models
+```
 
 ### Database
 
-Either run the Docker Compose `postgres` service, or provision your own PostgreSQL 16 instance and set `DATABASE_URL` accordingly before running `alembic upgrade head`.
+Either run the Docker Compose `postgres` service (already configured with `pgvector`), or provision your own PostgreSQL 16 instance with the `pgvector` extension enabled and set `DATABASE_URL` accordingly before running `alembic upgrade head`.
+
+### Redis
+
+Either run the Docker Compose `redis` service, or point `REDIS_URL` in `.env` at any Redis 7 instance.
 
 ### Docker
 
@@ -392,7 +547,7 @@ cd backend
 docker compose up --build
 ```
 
-### Environment variables
+### Environment Variables
 
 All settings live in `backend/.env` (see `backend/.env.example` for the full, documented list). The essentials to change before running anything real:
 
@@ -404,6 +559,7 @@ JWT_SECRET_KEY=change-me-jwt-32chars-minimum-in-production
 APP_SECRET_KEY=change-me-in-production-32chars-min
 
 # At least one AI provider, or KAVACH falls back to rule-based templates
+# and RAG features return "insufficient information" rather than hallucinating
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 GEMINI_API_KEY=
@@ -420,7 +576,7 @@ SLACK_WEBHOOK_URL=
 
 ---
 
-## Running Locally
+## Running the Project
 
 ### Backend
 
@@ -445,12 +601,6 @@ celery -A celery_worker.celery_app beat --loglevel=info
 
 > On Windows, add `--pool=solo` to each worker command.
 
-### Redis & Database
-
-```bash
-docker compose up postgres redis -d
-```
-
 ### Frontend
 
 ```bash
@@ -458,6 +608,14 @@ cd frontend
 npm run dev
 ```
 Dashboard available at `http://localhost:5173`.
+
+### Flutter Mobile
+
+```bash
+cd mobile
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1   # Android emulator
+flutter run --dart-define=API_BASE_URL=http://localhost:8000/api/v1  # iOS simulator / web preview
+```
 
 ### Docker Compose (full stack)
 
@@ -469,329 +627,158 @@ Brings up `postgres`, `redis`, `api` (`:8000`), `worker-critical`, `worker-defau
 
 ---
 
-## API Documentation
+## API
 
-Every route is versioned under `/api/v1` and (except the GitHub webhook, which is HMAC-verified instead) requires `Authorization: Bearer <access_token>`. The full, always-current schema is served live at `GET /docs` (Swagger UI) and `GET /redoc`, and can be exported to a static file with `python scripts/generate_openapi.py`.
+Every route is versioned under `/api/v1` and (except the GitHub webhook, which is HMAC-verified instead) requires `Authorization: Bearer <access_token>`. The full, always-current schema is served live at `GET /docs` and `GET /redoc`, and can be exported with `python scripts/generate_openapi.py`.
 
-### Auth
+### Authentication & Users
 
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/v1/auth/register` | Create an account (always least-privileged `read_only`) |
 | POST | `/api/v1/auth/login` | OAuth2 password flow — returns access + refresh tokens |
 | POST | `/api/v1/auth/refresh` | Exchange a refresh token for a new access token |
-| GET | `/api/v1/auth/me` | Current authenticated user |
+| GET | `/api/v1/auth/me` | Current authenticated user, including resolved permissions |
+| GET | `/api/v1/auth/admin/users` | List users *(admin)* |
+| PATCH | `/api/v1/auth/admin/users/{id}/role` | Change a user's role *(admin)* |
+| PATCH | `/api/v1/auth/admin/users/{id}/active` | Enable/disable a user *(admin)* |
+| GET | `/api/v1/auth/audit-log` | Query the audit log *(audit_log:read)* |
 
-**Example — login**
-```bash
-curl -X POST http://localhost:8000/api/v1/auth/login \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=you@bank.example&password=YourPassword123"
-```
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer"
-}
-```
-
-### Scanning
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/v1/scan` | Submit a repository as a `.zip` upload |
-| POST | `/api/v1/scan/repository` | Submit a repository by URL |
-| POST | `/api/v1/scan/premade/{risk_level}` | Run a bundled sandbox payload (`low`/`medium`/`high`) |
-| GET | `/api/v1/scan` | List scan jobs (filterable by status) |
-| GET | `/api/v1/scan/{scan_job_id}` | Get scan job status, progress, BRS/compliance summary |
-| POST | `/api/v1/scan/{scan_job_id}/cancel` | Cancel a queued or running scan |
-| WS | `/api/v1/scan/{scan_job_id}/ws` | Real-time per-scanner and job-level progress |
-| GET | `/api/v1/scan/{scan_job_id}/findings` | All findings for a completed scan |
-| GET | `/api/v1/scan/{scan_job_id}/compliance` | Live-recomputed compliance evaluation for a scan |
-| GET | `/api/v1/scan/{scan_job_id}/findings/{finding_id}/explain/stream` | SSE-streamed AI explanation for one finding |
-
-**Example — submit a repository by URL**
-```bash
-curl -X POST http://localhost:8000/api/v1/scan/repository \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-  -d '{"repo_url": "https://github.com/acme/payments-service", "priority": "high"}'
-```
-```json
-{
-  "scan_job_id": "3a5e2162-99ec-46f7-b134-a8b32aecc313",
-  "repository_id": "260357c7-7d92-4505-8b95-44c689dfa8b9",
-  "status": "queued",
-  "priority": "high",
-  "message": "Repository validated, scan job queued"
-}
-```
-
-**Example — scan status response**
-```json
-{
-  "scan_job_id": "3a5e2162-99ec-46f7-b134-a8b32aecc313",
-  "repository_name": "payments-service",
-  "status": "completed",
-  "progress_percent": 100,
-  "total_findings": 4,
-  "brs_score": 89.31,
-  "brs_risk_level": "Critical",
-  "zero_day_risk_score": 10.5,
-  "zero_day_risk_level": "Low",
-  "summary": {
-    "total": 4, "CRITICAL": 2, "HIGH": 1, "MEDIUM": 1, "LOW": 0, "INFO": 0,
-    "by_category": { "hardcoded_secret": 2, "sql_injection": 1, "vulnerable_dependency": 1 }
-  },
-  "worker_status": {
-    "semgrep": { "status": "completed", "findings_count": 2 },
-    "joern": { "status": "failed", "error": "..." }
-  }
-}
-```
-
-### Webhooks
-
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/v1/webhooks/github` | GitHub push-event receiver (HMAC-verified via `X-Hub-Signature-256`) |
-
-### Reports
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/v1/reports/{scan_job_id}` | Per-report-type generation status |
-| GET | `/api/v1/reports/{scan_job_id}/download/{report_type}` | Download (or S3 redirect for) a generated report |
-
-### Repositories
+### Repositories & Scans
 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/v1/repositories` | List known repositories |
-| PATCH | `/api/v1/repositories/{repository_id}/scheduled-scan` | Enable/disable nightly rescans |
+| PATCH | `/api/v1/repositories/{id}/scheduled-scan` | Enable/disable nightly rescans |
+| POST | `/api/v1/scan` | Submit a repository as a `.zip` upload |
+| POST | `/api/v1/scan/repository` | Submit a repository by URL |
+| POST | `/api/v1/scan/premade/{risk_level}` | Run a bundled sandbox payload (`low`/`medium`/`high`) |
+| GET | `/api/v1/scan` | List scan jobs (filterable by status) |
+| GET | `/api/v1/scan/{id}` | Scan job status, progress, BRS/compliance summary |
+| POST | `/api/v1/scan/{id}/cancel` | Cancel a queued or running scan |
+| WS | `/api/v1/scan/{id}/ws` | Real-time per-scanner and job-level progress |
+| GET | `/api/v1/scan/{id}/findings` | All findings for a completed scan |
 
-### Risk Configuration
+### Compliance & Reports
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/scan/{id}/compliance` | Live-recomputed compliance evaluation for a scan |
+| GET | `/api/v1/reports/{id}` | Per-report-type generation status |
+| GET | `/api/v1/reports/{id}/download/{type}` | Download (or S3 redirect for) a generated report |
+
+### Risk Configuration & Analytics
 
 | Method | Path | Description |
 |---|---|---|
 | GET/POST/PATCH/DELETE | `/api/v1/risk/modules` | Manage business-module criticality/asset-value config |
 | GET/PATCH | `/api/v1/risk/factor-weights/{factor_name}` | Manage BRS factor weights |
 | POST | `/api/v1/risk/preview` | Score a synthetic finding against current config |
+| GET | `/api/v1/analytics/my-activity` | Personal scan/finding activity summary |
+| GET | `/api/v1/analytics/team-activity` | Team-wide activity summary *(team_analytics:read)* |
+
+### AI & Knowledge Base
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/knowledge/upload` | Upload a reference document (PDF/Markdown/text) |
+| GET | `/api/v1/knowledge/documents` | List indexed documents |
+| POST | `/api/v1/knowledge/search` | Retrieve top-K chunks for a query (no LLM call) |
+| POST | `/api/v1/assistant/chat` | Streamed, RAG-grounded chat with citations |
+| GET | `/api/v1/findings/{id}/intelligence` | Citation-backed, RAG-grounded finding deep-dive |
+| GET | `/api/v1/scan/{id}/findings/{id}/explain/stream` | SSE-streamed automated explanation for one finding |
+| POST | `/api/v1/executive-intelligence/*` | Evidence-grounded executive Q&A |
+| POST | `/api/v1/rag-operations/benchmark` | Run the RAG benchmark suite *(team_analytics:read)* |
+| GET | `/api/v1/rag-operations/search-analytics` | RAG search analytics |
+| POST | `/api/v1/feedback` | Submit feedback on an AI response |
+
+### Webhooks & Notifications
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/webhooks/github` | GitHub push-event receiver (HMAC-verified via `X-Hub-Signature-256`) |
+
+There is no notification *inbox* endpoint today — Slack, email, and outbound webhook notifications are configured server-side and fire automatically on scan completion/failure and stalled-worker detection (`NOTIFICATIONS_ENABLED`, `SLACK_WEBHOOK_URL` in `.env`). A pull/list API for in-app notifications is on the [roadmap](#roadmap).
 
 ---
 
-## Banking Risk Score
+## Screenshots
 
-The BRS is computed per finding, then rolled up into one scan-level score.
+> Add real captures to `docs/screenshots/` and update the paths below — placeholders until then.
 
-### Methodology
-
-Each finding is scored as a **weighted average across 7 factors**, each normalized to 0–10:
-
-| Factor | What it measures |
+| | |
 |---|---|
-| `cvss` | The finding's own CVSS score, clamped 0–10 |
-| `exploitability` | Whether the finding is a known-exploited pattern/CVE |
-| `business_criticality` | The criticality weight of the business module the finding was found in (e.g. Payments > Reporting) |
-| `internet_exposure` | Whether the affected module is internet-facing |
-| `compliance_impact` | How many regulatory frameworks (RBI/PCI-DSS/SWIFT) the finding violates |
-| `asset_value` | The configured asset value of the affected module |
-| `historical_incidents` | Historical incident count recorded against that module |
-
-```
-blended = Σ(sub_score[factor] × weight[factor]) / Σ(weight[factor])
-BRS     = min(blended × 10, 100)
-```
-
-Business-module classification (which module a finding belongs to) and all 7 factor weights are **configurable per deployment** — stored in Postgres (`BusinessModule`, `RiskFactorWeight`) and editable live via `/api/v1/risk/modules` and `/api/v1/risk/factor-weights`, not hardcoded constants. A weighted **average** is used deliberately rather than a product: multiplying normalized terms collapses toward zero unless every factor is high, which doesn't match risk intuition — an actively-exploited RCE in the Payments module should be able to drive risk high on its own.
-
-### Risk categories
-
-| BRS range | Risk level |
-|---|---|
-| 0 – 34.9 | Low |
-| 35.0 – 57.9 | Medium |
-| 58.0 – 81.9 | High |
-| 82.0 – 100 | Critical |
-
-Thresholds are calibrated against this specific formula (not inherited CVSS-style cutoffs) — `business_criticality` and `asset_value` are flat per-module properties, so even a zero-CVSS finding in the most permissive module still blends to roughly 24.
-
-### Zero-Day Risk Score
-
-A separate, independent 0–100 predictive score estimating exposure to *undisclosed* vulnerabilities, summing six weighted factors: dependency count, known-CVE density, dependency staleness (average age), risky package categories, configuration risk, and code vulnerability density. This deliberately does not feed into BRS — a codebase can score well on known findings and still carry high latent risk from outdated, unaudited dependencies.
-
----
-
-## AI Layer
-
-KAVACH's AI layer (`app/services/ai/`) is a provider-agnostic gateway, not a hard dependency on any single vendor.
-
-### Claude / multi-provider integration
-
-`app/services/ai/gateway.py` resolves a provider order from a single `AI_MODE` setting:
-
-- **`hybrid`** (default) — try local providers (Ollama/vLLM) first; fall back to cloud (Claude/OpenAI/Gemini) only if local is unreachable or unconfigured.
-- **`cloud`** — only Claude/OpenAI/Gemini are ever attempted.
-- **`local`** — only Ollama/vLLM are ever attempted, no cloud fallback even if cloud keys happen to be present.
-
-Every provider (`app/services/ai/providers/`) is called over plain REST via `httpx` — no vendor SDK dependency. `AI_PROVIDER_PRIORITY` is an escape hatch to override the resolved order outright (e.g. `"vllm,ollama,claude"`).
-
-### Caching
-
-- **Semantic cache** (`semantic_cache.py`) — near-identical findings (same category/severity/pattern) reuse a previously generated explanation instead of re-querying the provider, with a configurable TTL (`AI_CACHE_TTL_SECONDS`, default 24h).
-- **Request deduplication** (`request_lock.py`) — concurrent identical requests within a batch collapse to a single upstream call.
-
-### Prompt optimization
-
-- **Sanitization** (`sanitizer.py`) — strips sensitive data (secrets, PII-shaped strings) from a finding before it's sent to any cloud provider.
-- **Chunking** (`chunking.py`) and **token estimation** (`token_estimator.py`) — keep batched explanation requests within provider context limits.
-- **Template fallback** (`templates.py`) — a rule-based library of category-specific explanations, business impact, and remediation guidance used whenever no provider is configured or every provider fails — the platform never blocks scan completion on AI availability.
-
-### Local LLM support
-
-Local inference is **implemented today**, not a future item: `ollama_provider.py` and `vllm_provider.py` call a self-hosted Ollama or vLLM server exactly like a cloud provider, selected via `OLLAMA_MODEL`/`VLLM_MODEL` and `AI_MODE=local` or `hybrid`. Validated model tags include Llama 3, Mistral, Phi-3, and Mixtral (Ollama) and their HuggingFace-servable equivalents (vLLM).
-
----
-
-## Compliance Engine
-
-### Supported frameworks
-
-- **RBI IT Framework 2021** (Reserve Bank of India)
-- **PCI-DSS v4.0** (Payment Card Industry Data Security Standard)
-- **SWIFT Customer Security Programme (CSP)**
-
-Each framework's controls are defined declaratively in `app/data/compliance_rules/*.yaml`, loaded by `rule_loader.py` — adding or amending a control is a YAML change, not a code change.
-
-### Deterministic mapping
-
-`compliance_mapper.py` maps every finding to the specific clause(s) it violates per framework, purely from the finding's category/severity/CWE — no AI involved, no non-determinism. `compliance_engine.py` then evaluates, per scan, every control in every framework as PASS or FAIL based on whether any finding maps to it, producing a point-in-time compliance snapshot (`overall_compliance_percentage`, per-framework `passed_controls`/`failed_controls`, and per-control evidence linking back to the actual findings).
-
----
-
-## Dashboard
-
-The React SPA (`frontend/src/pages/`) is code-split per route and covers:
-
-| Page | What it shows |
-|---|---|
-| **Repositories** | Every repository KAVACH has scanned, with a nightly-rescan toggle and a "scan again" action |
-| **Scan Queue** | All scan jobs, filterable by status, with a live detail panel (WebSocket-driven per-scanner progress, cancel action, report downloads once complete) |
-| **Risk Dashboard** | Portfolio-wide BRS trend line, top-risk repositories bar chart, and a recent-completed-scans table |
-| **Compliance Dashboard** | Per-scan overall compliance percentage, a per-framework compliance bar chart, and a control-by-control PASS/FAIL table with linked evidence |
-| **Finding Explorer** | Searchable/filterable finding list for a selected scan, with a detail modal (description, AI explanation/impact/remediation, compliance clauses) |
-| **Executive Summary** | Portfolio-level KPIs — repository count, completed-scan count, average BRS, critical-finding count — plus an aggregated severity-distribution chart and top-risk-repository list |
-| **Login** | Email/password authentication |
-
-Charts (BRS trend, severity distribution, compliance-by-framework) are built on Recharts against a validated, colorblind-safe categorical/status palette, with light/dark variants and real tooltips.
-
----
-
-## Reports
-
-Every completed scan generates 7 report artifacts asynchronously (`app/services/reports/report_generator.py`, dispatched via `app/tasks/report_tasks.py`) — generation never blocks scan completion, and each report type is tracked and retried independently.
-
-| Format | Contents |
-|---|---|
-| **PDF (executive)** | Business-facing summary — BRS, risk level, compliance status, top findings |
-| **PDF (technical)** | Full technical finding detail for engineering teams |
-| **SARIF** | Static Analysis Results Interchange Format — for IDE/CI integration |
-| **SBOM** | CycloneDX Software Bill of Materials |
-| **Unified findings JSON** | The full enriched, cross-tool-correlated finding set |
-| **Compliance report (JSON)** | The point-in-time compliance snapshot |
-| **CSV** | Flat finding export for spreadsheet triage |
-
-Storage is backend-agnostic (`app/services/reports/storage.py`): `local` disk (default) or S3/MinIO, with presigned-URL downloads for the latter. A nightly archive sweep reclaims report *files* (not the underlying scan/finding/compliance database history) past a configurable retention window (`ARCHIVE_AFTER_DAYS`, default 90).
-
----
-
-## Security
-
-| Area | Implementation |
-|---|---|
-| **Authentication** | JWT access (short-lived) + refresh (long-lived) tokens; local email/password via bcrypt |
-| **SSO** | Generic OAuth2/OIDC authorization-code flow (any standards-compliant IdP); LDAP via real search+bind; SAML routes exist but return 503 pending an XML-security toolkit dependency |
-| **RBAC** | 5 fixed roles — `admin`, `auditor`, `developer`, `security_engineer`, `read_only` — enforced both via a coarse app-wide middleware (blocks any mutating request from strictly-read-only roles) and fine-grained per-route `require_permission(...)` dependencies |
-| **Rate Limiting** | Redis-backed fixed-window limiter, keyed per client IP, fails open if Redis is unreachable rather than blocking the API |
-| **Input Validation** | Pydantic schema validation on every request body; repository URL host allowlisting (GitHub/GitLab/Bitbucket only) |
-| **Secrets** | Webhook payloads verified via HMAC-SHA256 (constant-time comparison); outbound notification webhooks HMAC-signed the same way; no secret ever logged |
-| **Encryption** | TLS termination at the ingress/load balancer; JWT signed with HS256; passwords hashed with bcrypt |
-| **Audit Logging** | Every login attempt (success/failure), role change, and admin action persisted to Postgres with actor, IP, and outcome |
-
----
-
-## Deployment
-
-### Docker
-
-`backend/docker-compose.yml` defines the full local stack: `postgres`, `redis`, `api`, `worker-critical`, `worker-default`, `beat`, `flower`, and `frontend`. Scale worker capacity horizontally with `docker compose up --scale worker-default=10`.
-
-### Kubernetes
-
-A production-grade Helm chart lives at `helm/kavach/` — 21 templates covering:
-
-- `Deployment`s for the API, both worker pools, beat, Flower, and the frontend
-- `StatefulSet`s for Postgres and Redis (or point at externally-managed instances)
-- `HorizontalPodAutoscaler` and `PodDisruptionBudget` for the API and default worker pool
-- `NetworkPolicy` restricting database/broker access to the chart's own pods
-- An `Ingress` routing `/api/*` to the API and `/` to the frontend
-- A pre-install/upgrade `Job` running `alembic upgrade head` before any pod expecting the new schema rolls out
-- Optional, disabled-by-default observability resources (`ServiceMonitor`, `PrometheusRule`, `AlertmanagerConfig`, a celery-exporter Deployment, and Grafana dashboard ConfigMaps) that assume a pre-existing kube-prometheus-stack
-
-```bash
-helm install kavach ./helm/kavach \
-  --set secrets.jwtSecretKey=... \
-  --set secrets.appSecretKey=... \
-  --set secrets.githubWebhookSecret=...
-```
-
-### Environment Variables
-
-The full, documented list lives in `backend/.env.example`. Every setting maps 1:1 to a Helm `values.yaml` key under `config:` (non-secret) or `secrets:` (sensitive) — see [Environment variables](#environment-variables) above for the essentials.
-
-### Production considerations
-
-- Set real, unique `JWT_SECRET_KEY` and `APP_SECRET_KEY` values — the defaults are placeholders and will fail obviously-insecure checks in review.
-- Point `REPORT_STORAGE_BACKEND=s3` at a real bucket (or MinIO) in any multi-replica deployment — local-disk report storage assumes a single shared volume, which the Helm chart provides via a shared PVC, but S3 removes that constraint entirely.
-- Configure `ALLOWED_ORIGINS` to the exact origin(s) your frontend is served from — CORS rejects everything else, including error responses (both are HMAC/credentialed and deliberately strict).
-- Scale `worker-default` horizontally for throughput; `worker-critical` is intentionally a smaller, dedicated pool so a backlog of low-priority scans can never starve high-priority ones.
-- Wire up the observability stack (`monitoring.*` values) once a kube-prometheus-stack is present in-cluster — it is off by default so the chart installs cleanly without one.
+| **Landing Page** <br> ![Landing page](docs/screenshots/landing.png) | **Dashboard** <br> ![Dashboard](docs/screenshots/dashboard.png) |
+| **Architecture Explorer** <br> ![3D architecture explorer](docs/screenshots/architecture.png) | **Scan Results** <br> ![Scan results](docs/screenshots/scan-results.png) |
+| **Reports** <br> ![Report generation](docs/screenshots/reports.png) | **Flutter App** <br> ![Flutter mobile app](docs/screenshots/mobile.png) |
 
 ---
 
 ## Roadmap
 
-**Implemented today** (see [Key Features](#key-features) for the full list): static/dependency/config/secret/container scanning, cross-tool aggregation, BRS + zero-day scoring, RBI/PCI-DSS/SWIFT compliance mapping, multi-provider AI (cloud + local), GitHub webhook intake, scheduled rescans, real-time WebSocket progress, 7 report formats, JWT/RBAC/OAuth2/LDAP auth, Prometheus/Grafana/OpenTelemetry observability, Docker Compose and Kubernetes/Helm deployment, and a 38-test suite (unit + real-infrastructure integration).
+### Completed
 
-**Planned**
+Static/dependency/config/secret/container scanning across 9 tools; cross-tool aggregation; Banking Risk Score + Attack Surface Exposure; RBI/PCI DSS/SWIFT CSP compliance mapping; a full retrieval-augmented-generation knowledge layer (Knowledge Base, AI Assistant, Finding Intelligence, Executive Intelligence) with citations, confidence gating, and production hardening (caching, rate limiting, analytics, feedback, benchmarking); automated per-finding explanations with multi-provider (cloud + local) AI and template fallback; GitHub webhook intake; scheduled rescans; real-time WebSocket scan progress; 7 report formats; JWT/RBAC/OAuth2/LDAP auth; a native Flutter mobile client; Prometheus/Grafana/OpenTelemetry observability; Docker Compose and Kubernetes/Helm deployment; a CI/CD pipeline (test, lint, build, deploy); a growing unit + real-infrastructure integration test suite.
+
+### Current focus
+
+- Wiring the Flutter mobile client's live scan-progress screen to the existing WebSocket endpoint (currently polling-only)
+- A cross-scan findings/compliance rollup endpoint, so both clients can show "all findings across my repositories" without composing it from per-scan calls
 - Full SAML 2.0 assertion validation (currently scaffolded behind a 503 pending an `xmlsec`-backed toolkit dependency)
-- GitLab and Bitbucket inbound webhook receivers (outbound download clients for both already exist; only the GitHub push receiver exists today)
-- Pull-request-triggered scans (diff-scoped), in addition to the current push-triggered full scans
-- Automatic S3 lifecycle-policy management for archived report objects (the archive sweep currently reclaims local files and S3 objects directly; bucket-level lifecycle rules are not yet templated)
-- A manual, on-demand archive-sweep trigger endpoint for operators
-- Expanded compliance framework coverage beyond RBI/PCI-DSS/SWIFT CSP (e.g. ISO 27001, SOC 2)
+
+### Future
+
+- **A notifications inbox API** — list/mark-read for in-app notifications, and device push-token registration for the mobile client (today, delivery is outbound-only: Slack/email/webhook)
+- **Knowledge Graph** — linking findings, CWEs, and compliance clauses into a queryable graph rather than flat per-finding fields
+- **Root Cause Intelligence** — tracing a class of finding back to the commit/pattern that introduced it across a repository's history
+- **Security Copilot** — an assistant that can propose (not apply) a remediation diff, not just describe one
+- **Compliance Copilot** — conversational drafting of audit evidence packages from the compliance engine's own PASS/FAIL data
+- **Historical Similar Findings** — surfacing prior findings and their eventual resolution when a new, similar one appears
+- **Enterprise Integrations** — GitLab/Bitbucket inbound webhook receivers (outbound download clients already exist), pull-request-triggered diff-scoped scans, Jira/ServiceNow ticket creation, SIEM export
+- **Expanded compliance coverage** beyond RBI/PCI DSS/SWIFT CSP (e.g. ISO 27001, SOC 2)
+- **Automatic S3 lifecycle-policy management** for archived report objects, and a manual, on-demand archive-sweep trigger for operators
 
 ---
 
 ## Contributing
 
-KAVACH follows standard GitHub contribution practices:
-
 1. **Fork** the repository and create a feature branch from `main` (`git checkout -b feature/your-feature`).
-2. **Write real tests** for any new behavior — unit tests for pure logic (see `tests/test_brs_engine.py`), integration tests against real infrastructure for anything DB/queue/API-facing (see `tests/integration/`). PRs that touch scanning, aggregation, risk scoring, or compliance mapping without a corresponding test will be asked for one.
-3. **Match existing conventions** — structured logging via `structlog`, async SQLAlchemy sessions via the existing repository pattern, Pydantic schemas for every API boundary, and comments that explain *why*, not *what*.
+2. **Write real tests** for any new behavior — unit tests for pure logic (see `backend/tests/test_brs_engine.py`), integration tests against real infrastructure for anything DB/queue/API-facing (see `backend/tests/integration/`). PRs that touch scanning, aggregation, risk scoring, compliance mapping, or the RAG pipeline without a corresponding test will be asked for one.
+3. **Match existing conventions** — structured logging via `structlog`, async SQLAlchemy sessions via the existing repository pattern, Pydantic schemas for every API boundary, freezed/Riverpod conventions on the Flutter side, and comments that explain *why*, not *what*.
 4. **Run the full check before opening a PR**:
    ```bash
    # backend
    cd backend && pytest && alembic upgrade head
+
    # frontend
    cd frontend && npm run lint && npx tsc -b --noEmit && npm run build
+
+   # mobile
+   cd mobile && flutter analyze && flutter test
    ```
 5. **Open a pull request** with a clear description of the problem, the approach, and how it was verified. Include migration files for any schema change — never hand-edit an already-applied migration.
-6. **Security-sensitive changes** (auth, RBAC, webhook verification, secret handling) should call that out explicitly in the PR description for closer review.
+6. **Security-sensitive changes** (auth, RBAC, webhook verification, secret handling, anything touching the AI confidence gate) should call that out explicitly in the PR description for closer review.
 
 ---
 
 ## License
 
 Proprietary — All Rights Reserved. This repository does not currently carry an open-source license; all rights to the source code are reserved by the project maintainers. Contact the maintainers before redistributing, sublicensing, or using this code outside its intended engagement.
+
+---
+
+## Acknowledgements
+
+KAVACH is built on top of, and would not exist without, the following open-source projects:
+
+**Scanning & security tooling** — [Semgrep](https://semgrep.dev/), [ast-grep](https://ast-grep.github.io/), [Joern](https://joern.io/), [pip-audit](https://github.com/pypa/pip-audit), [OSV.dev](https://osv.dev/), the [NVD CVE API](https://nvd.nist.gov/developers), [CycloneDX](https://cyclonedx.org/), the [SARIF](https://sarifweb.azurewebsites.net/) specification.
+
+**Backend** — [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy](https://www.sqlalchemy.org/), [Celery](https://docs.celeryq.dev/), [Pydantic](https://docs.pydantic.dev/), [PostgreSQL](https://www.postgresql.org/) and [pgvector](https://github.com/pgvector/pgvector), [Redis](https://redis.io/), [ReportLab](https://www.reportlab.com/).
+
+**AI / RAG** — [fastembed](https://github.com/qdrant/fastembed) and the [`BAAI/bge-small-en-v1.5`](https://huggingface.co/BAAI/bge-small-en-v1.5) and [`Xenova/ms-marco-MiniLM-L-6-v2`](https://huggingface.co/Xenova/ms-marco-MiniLM-L-6-v2) models it serves, plus Anthropic, OpenAI, Google, [Ollama](https://ollama.com/), and [vLLM](https://github.com/vllm-project/vllm) for LLM inference.
+
+**Frontend** — [React](https://react.dev/), [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/), [Recharts](https://recharts.org/), [react-three-fiber](https://docs.pmnd.rs/react-three-fiber) and [three.js](https://threejs.org/), [Framer Motion](https://www.framer.com/motion/).
+
+**Mobile** — [Flutter](https://flutter.dev/) and [Riverpod](https://riverpod.dev/).
+
+**Infrastructure & observability** — [Docker](https://www.docker.com/), [Kubernetes](https://kubernetes.io/) and [Helm](https://helm.sh/), [Prometheus](https://prometheus.io/), [Grafana](https://grafana.com/), [OpenTelemetry](https://opentelemetry.io/), [Flower](https://flower.readthedocs.io/).

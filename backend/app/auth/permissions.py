@@ -41,6 +41,19 @@ class Permission(str, enum.Enum):
     COMPLIANCE_READ = "compliance:read"
     USER_MANAGE = "user:manage"
     AUDIT_LOG_READ = "audit_log:read"
+    # Org-wide "who's doing what" aggregation (GET /api/v1/analytics/team-activity)
+    # — deliberately separate from AUDIT_LOG_READ: that's a security/compliance
+    # trail (who changed what), this is scan-activity performance reporting
+    # (how much got scanned, by whom, what it found). A Security Manager
+    # reviewing team throughput doesn't need — and per least-privilege
+    # shouldn't be handed — audit-log access just to see it, and vice versa.
+    TEAM_ANALYTICS_READ = "team_analytics:read"
+    # Knowledge base (RAG Milestone 1 — app/services/knowledge_base/).
+    # Split the same way SCAN_READ/SCAN_CREATE are: everyone who can use
+    # the knowledge base can search/list it, but uploading and deleting
+    # documents is a narrower, content-curation privilege.
+    KNOWLEDGE_READ = "knowledge:read"
+    KNOWLEDGE_WRITE = "knowledge:write"
 
 
 _ALL_PERMISSIONS = frozenset(Permission)
@@ -59,13 +72,22 @@ _DEVELOPER_PERMISSIONS = _READ_ONLY_PERMISSIONS | frozenset(
         Permission.SCAN_CANCEL,
         Permission.RISK_CONFIG_READ,
         Permission.COMPLIANCE_READ,
+        Permission.KNOWLEDGE_READ,
+        Permission.KNOWLEDGE_WRITE,
     }
 )
 
-_SECURITY_ENGINEER_PERMISSIONS = _DEVELOPER_PERMISSIONS | frozenset(
+# Built as "developer's set, minus knowledge-base write, plus manager-only
+# extras" rather than a plain `_DEVELOPER_PERMISSIONS | {...}` union like
+# every other role here: KNOWLEDGE_WRITE is deliberately Security
+# Analyst/Admin-only ("upload/delete documents"), so Security Manager
+# can't simply inherit everything Analyst has this one time — per the
+# knowledge-base spec, a Manager searches but does not curate the corpus.
+_SECURITY_ENGINEER_PERMISSIONS = (_DEVELOPER_PERMISSIONS - frozenset({Permission.KNOWLEDGE_WRITE})) | frozenset(
     {
         Permission.RISK_CONFIG_WRITE,
         Permission.AUDIT_LOG_READ,
+        Permission.TEAM_ANALYTICS_READ,
     }
 )
 
@@ -74,6 +96,7 @@ _AUDITOR_PERMISSIONS = _READ_ONLY_PERMISSIONS | frozenset(
         Permission.RISK_CONFIG_READ,
         Permission.COMPLIANCE_READ,
         Permission.AUDIT_LOG_READ,
+        Permission.KNOWLEDGE_READ,
     }
 )
 # Deliberately excludes SCAN_CREATE/SCAN_CANCEL/RISK_CONFIG_WRITE: an
@@ -87,6 +110,35 @@ ROLE_PERMISSIONS: dict[UserRole, frozenset[Permission]] = {
     UserRole.DEVELOPER: _DEVELOPER_PERMISSIONS,
     UserRole.AUDITOR: _AUDITOR_PERMISSIONS,
     UserRole.READ_ONLY: _READ_ONLY_PERMISSIONS,
+}
+
+# Presentation-layer names only — the underlying UserRole enum values
+# ("developer", "security_engineer", "auditor", ...) are unchanged, so every
+# existing user account, JWT, and DB row keeps working exactly as before.
+# Mapped onto the closest existing role by actual permission shape, not by
+# name:
+#   Security Analyst   <- DEVELOPER          (can create/cancel scans, read
+#                                              risk/compliance — hands-on
+#                                              finding triage work)
+#   Security Manager   <- SECURITY_ENGINEER  (everything Analyst can, plus
+#                                              risk-config writes, audit log,
+#                                              team analytics)
+#   Administrator      <- ADMIN              (unchanged — full platform control)
+#   Executive / Board  <- AUDITOR            (read-only across risk/compliance/
+#                                              audit; cannot create/cancel scans
+#                                              or write anything — matches the
+#                                              "cannot trigger scans, modify
+#                                              findings, change repositories,
+#                                              edit users" requirement exactly)
+# READ_ONLY has no dedicated named role in the 4-role model — it remains the
+# system default for self-registration (see UserRegisterRequest) and for any
+# other minimal-viewer use case.
+ROLE_DISPLAY_NAMES: dict[UserRole, str] = {
+    UserRole.ADMIN: "Administrator",
+    UserRole.SECURITY_ENGINEER: "Security Manager",
+    UserRole.DEVELOPER: "Security Analyst",
+    UserRole.AUDITOR: "Executive / Board Member",
+    UserRole.READ_ONLY: "Read Only",
 }
 
 

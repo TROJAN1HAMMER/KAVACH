@@ -10,10 +10,12 @@ What it checks: the JWT access token's embedded `role` claim (no DB
 round-trip on the common/allowed path — see `security.py`'s
 `create_access_token` docstring for why that's safe for a coarse check)
 against one blanket rule — READ_ONLY and AUDITOR can never perform a
-mutating HTTP method (POST/PUT/PATCH/DELETE) anywhere in the API, full
-stop. This catches "a developer forgot to add `require_permission` to a
-new mutating route" for free, for exactly those two strictly-read-only
-roles, without every route needing to remember to protect itself.
+mutating HTTP method (POST/PUT/PATCH/DELETE) anywhere in the API, except
+the narrow, explicit `READ_ONLY_QUERY_PATH_PREFIXES` allowlist below for
+POST-shaped read/search endpoints. This catches "a developer forgot to
+add `require_permission` to a new mutating route" for free, for exactly
+those two strictly-read-only roles, without every route needing to
+remember to protect itself.
 
 It deliberately does NOT enforce anything more specific than that (e.g.
 "a Developer can't write risk_config") — that's what the resource-
@@ -59,6 +61,22 @@ EXEMPT_PATH_PREFIXES = (
     "/api/v1/auth/ldap/login",
 )
 
+# Not an auth-bootstrapping exemption like the list above — these are POST
+# endpoints where POST only carries a JSON request body (filters/a search
+# query too complex for a query string), not a mutation. Blocking them for
+# READ_ONLY/AUDITOR would contradict those roles' own fine-grained
+# permissions — Auditor is deliberately granted Permission.KNOWLEDGE_READ
+# specifically so it CAN search (see app/auth/permissions.py), and the
+# HTTP-verb heuristic this middleware otherwise relies on can't tell a
+# search from a write. Every path listed here must already be protected by
+# its own `require_permission(...)` dependency at the route — this list
+# only lifts the coarse verb-based block, it never grants access on its own.
+READ_ONLY_QUERY_PATH_PREFIXES = (
+    "/api/v1/knowledge/search",
+    "/api/v1/assistant/chat",
+    "/api/v1/executive-intelligence/",
+)
+
 
 class PermissionMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -66,6 +84,9 @@ class PermissionMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if any(request.url.path.startswith(prefix) for prefix in EXEMPT_PATH_PREFIXES):
+            return await call_next(request)
+
+        if any(request.url.path.startswith(prefix) for prefix in READ_ONLY_QUERY_PATH_PREFIXES):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")

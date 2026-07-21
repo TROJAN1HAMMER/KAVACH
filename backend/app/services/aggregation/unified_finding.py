@@ -2,7 +2,7 @@
 KAVACH — Unified Finding Model
 The aggregation layer's output schema. `UnifiedFinding` is a strict
 superset of `RawFinding` — every field the BRS engine, compliance mapper,
-zero-day predictor, and report generator already read (`.severity`,
+attack surface exposure module, and report generator already read (`.severity`,
 `.cvss`, `.category`, `.file_path`, ...) is still there, unchanged. That's
 deliberate: none of that downstream code needs to change to consume
 enriched, cross-tool-correlated findings instead of one tool's raw

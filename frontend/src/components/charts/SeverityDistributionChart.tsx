@@ -1,6 +1,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SEVERITY_ORDER, severityStyle } from "../../lib/severity";
 import { useTheme } from "../../hooks/useTheme";
+import { useChartEntryAnimation } from "../../hooks/useChartEntryAnimation";
 import type { Severity } from "../../types/api";
 
 interface SeverityDistributionChartProps {
@@ -10,6 +11,7 @@ interface SeverityDistributionChartProps {
 
 export function SeverityDistributionChart({ counts, height = 260 }: SeverityDistributionChartProps) {
   const { theme } = useTheme();
+  const isAnimationActive = useChartEntryAnimation(700);
   const data = SEVERITY_ORDER.map((severity) => ({
     severity,
     label: severityStyle(severity).label,
@@ -47,7 +49,14 @@ export function SeverityDistributionChart({ counts, height = 260 }: SeverityDist
           }}
           formatter={(value) => [Number(value), "Findings"]}
         />
-        <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
+        <Bar
+          dataKey="count"
+          radius={[4, 4, 0, 0]}
+          maxBarSize={40}
+          isAnimationActive={isAnimationActive}
+          animationDuration={700}
+          animationEasing="ease-out"
+        >
           {data.map((entry) => (
             <Cell key={entry.severity} fill={severityStyle(entry.severity).hex} />
           ))}

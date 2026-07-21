@@ -17,6 +17,7 @@ from app.db.base import Base
 from app.models import (  # noqa: F401
     business_module,
     finding,
+    knowledge,
     report,
     repository,
     risk_factor_weight,

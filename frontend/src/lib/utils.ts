@@ -48,6 +48,14 @@ export function formatRelativeTime(value: string | null | undefined): string {
   return rtf.format(-duration, "year");
 }
 
+export function formatDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return "—";
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.round(seconds % 60);
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
 export function truncateMiddle(value: string, maxLength = 48): string {
   if (value.length <= maxLength) return value;
   const half = Math.floor((maxLength - 1) / 2);

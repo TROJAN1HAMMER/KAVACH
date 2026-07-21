@@ -76,8 +76,22 @@ COPY --chown=kavach:kavach . .
 # PVCs) — the mount will impose its own ownership, but pre-creating these
 # with the right owner means a purely local `docker run` (no volumes
 # attached) still works without a permission error.
-RUN mkdir -p uploads reports data \
+RUN mkdir -p uploads reports data data/knowledge_base data/fastembed_cache data/rerank_cache \
     && chown -R kavach:kavach /app
+
+# Pre-download the knowledge-base embedding model at build time (~130MB),
+# so no container ever needs internet access at runtime just to embed a
+# document or a search query — same reasoning as vendoring any other
+# runtime asset. Must match app/config.py's `knowledge_embedding_model`
+# default; if that default ever changes, this line does too.
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/app/data/fastembed_cache')" \
+    && chown -R kavach:kavach /app/data/fastembed_cache
+
+# Same reasoning, for the AI Assistant's reranking cross-encoder (RAG
+# Milestone 2 — app/services/assistant/rerank_manager.py). Must match
+# app/config.py's `assistant_rerank_model` default.
+RUN python -c "from fastembed.rerank.cross_encoder import TextCrossEncoder; TextCrossEncoder(model_name='Xenova/ms-marco-MiniLM-L-6-v2', cache_dir='/app/data/rerank_cache')" \
+    && chown -R kavach:kavach /app/data/rerank_cache
 
 USER kavach
 

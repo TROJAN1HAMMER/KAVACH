@@ -3,7 +3,7 @@ KAVACH — ScanJob Model
 The unit of work the orchestrator queues, runs, and tracks. Supersedes the
 earlier flat `Scan` model: queue/lifecycle concerns (status, priority,
 retries, timeout, heartbeat, progress) live here; the computed outcome
-(BRS score, zero-day score, summaries) lives in `ScanResult` — a 1:1
+(BRS score, attack surface exposure score, summaries) lives in `ScanResult` — a 1:1
 sibling, not inline columns, so a job can exist (queued/running/failed)
 before any result has been computed.
 """

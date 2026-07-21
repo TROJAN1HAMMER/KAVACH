@@ -1,0 +1,22 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "**/*.freezed.dart"
+    - "**/*.g.dart"
+    - "build/**"
+  errors:
+    # Documented freezed+json_serializable false-positive: `@JsonKey` on a
+    # `const factory` constructor parameter is the correct, working pattern
+    # (see https://pub.dev/packages/freezed#custom-getters-and-methods) but
+    # the analyzer flags it as if it were a plain constructor parameter.
+    invalid_annotation_target: ignore
+
+linter:
+  rules:
+    prefer_single_quotes: true
+    always_declare_return_types: true
+    avoid_print: true
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    require_trailing_commas: true

@@ -15,7 +15,7 @@ Responsibilities:
      structurally can't merge the same issue reported by two different
      tools (its fingerprint includes `source`, so two tools always
      produce two fingerprints for what's really one finding)
-  3. Score (BRS, zero-day), map to compliance, generate AI insights —
+  3. Score (BRS, attack surface exposure), map to compliance, generate AI insights —
      identical calls to what the pipeline always made; `UnifiedFinding`
      is a strict superset of `RawFinding`, so none of that code changed
   4. Persist Finding/Report/ScanResult (now carrying cross-tool
@@ -56,7 +56,7 @@ from app.services.compliance.compliance_mapper import get_compliance_summary, ma
 from app.services.notifications.notification_service import get_notification_service
 from app.services.reports import report_generator
 from app.services.risk.brs_engine import _calculate_risk_level, calculate_brs
-from app.services.risk.zero_day_predictor import predict_zero_day_risk
+from app.services.risk.attack_surface_exposure import calculate_attack_surface_exposure
 from app.services.scanning.aggregator import summarize_findings
 from app.tasks.report_tasks import generate_reports_task
 from app.workers.celery_app import celery_app, queue_for_priority
@@ -158,8 +158,9 @@ async def _aggregate(results: list[dict], scan_job_id: str) -> None:
             db=db,
             repository_id=job.repository_id,
             compliance_data_list=compliance_data_list,
+            scanner_coverage_ratio=len(successful) / len(results) if results else 1.0,
         )
-        zero_day_result = predict_zero_day_risk(all_findings, sbom)
+        attack_surface_result = calculate_attack_surface_exposure(all_findings, sbom)
         ai_insights = await asyncio.to_thread(generate_batch_insights, all_findings, compliance_data_list)
 
         # ── Build Finding rows + report_generator's plain-dict shape ──
@@ -316,8 +317,8 @@ async def _aggregate(results: list[dict], scan_job_id: str) -> None:
                 "findings": finding_dicts_for_reports,
                 "brs_score": brs_result.total_brs,
                 "brs_risk_level": brs_result.risk_level,
-                "zero_day_score": zero_day_result.risk_score,
-                "zero_day_level": zero_day_result.risk_level,
+                "attack_surface_exposure_score": attack_surface_result.risk_score,
+                "attack_surface_exposure_level": attack_surface_result.risk_level,
                 "compliance_summary": compliance_summary,
                 "summary": summary,
                 "sbom": sbom,
@@ -335,8 +336,8 @@ async def _aggregate(results: list[dict], scan_job_id: str) -> None:
             total_findings=len(all_findings),
             brs_score=brs_result.total_brs,
             brs_risk_level=brs_result.risk_level,
-            zero_day_risk_score=zero_day_result.risk_score,
-            zero_day_risk_level=zero_day_result.risk_level,
+            attack_surface_exposure_score=attack_surface_result.risk_score,
+            attack_surface_exposure_level=attack_surface_result.risk_level,
             summary=summary,
             compliance_summary=compliance_summary,
         )

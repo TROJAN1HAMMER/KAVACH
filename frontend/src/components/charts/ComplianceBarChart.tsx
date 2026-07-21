@@ -1,5 +1,6 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTheme } from "../../hooks/useTheme";
+import { useChartEntryAnimation } from "../../hooks/useChartEntryAnimation";
 import { CATEGORICAL_PALETTE } from "../../lib/severity";
 
 export interface ComplianceBarPoint {
@@ -10,6 +11,7 @@ export interface ComplianceBarPoint {
 
 export function ComplianceBarChart({ points, height = 240 }: { points: ComplianceBarPoint[]; height?: number }) {
   const { theme } = useTheme();
+  const isAnimationActive = useChartEntryAnimation(700);
   const gridColor = theme === "dark" ? "#2c2c2a" : "#e1e0d9";
   const axisColor = theme === "dark" ? "#c3c2b7" : "#52514e";
   const mode = theme === "dark" ? "dark" : "light";
@@ -45,7 +47,14 @@ export function ComplianceBarChart({ points, height = 240 }: { points: Complianc
           }}
           formatter={(value, _name, payload) => [`${Number(value).toFixed(0)}%`, payload.payload.frameworkName]}
         />
-        <Bar dataKey="compliancePercentage" radius={[0, 4, 4, 0]} maxBarSize={24}>
+        <Bar
+          dataKey="compliancePercentage"
+          radius={[0, 4, 4, 0]}
+          maxBarSize={24}
+          isAnimationActive={isAnimationActive}
+          animationDuration={700}
+          animationEasing="ease-out"
+        >
           {points.map((entry, index) => (
             <Cell key={entry.shortCode} fill={CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length][mode]} />
           ))}

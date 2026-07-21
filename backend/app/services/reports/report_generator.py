@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional, Union, Dict
+from xml.sax.saxutils import escape as _xml_escape
 import structlog
 
 from reportlab.lib import colors
@@ -73,6 +74,21 @@ RISK_COLORS = {
 }
 
 SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+
+
+def _esc(value) -> str:
+    """
+    Escape dynamic scanner/AI-provided text before it is interpolated into an
+    f-string that gets passed to a ReportLab ``Paragraph``. ``Paragraph`` parses
+    a mini-XML markup language, so raw content containing literal ``<``, ``>``,
+    or unescaped ``&`` (plausible in descriptions, code snippets, file paths,
+    etc.) can raise at ``doc.build()`` or silently corrupt the tag stack.
+    Do NOT use this on markup this file itself constructs (e.g. ``<b>`` wrappers)
+    — only on the dynamic data being inserted into it.
+    """
+    if value is None:
+        return ""
+    return _xml_escape(str(value))
 
 
 # ── Charts (reportlab.graphics — no extra dependency beyond reportlab itself) ──
@@ -212,6 +228,31 @@ class KavachPDFReport:
             leading=11,
         ))
         self.styles.add(ParagraphStyle(
+            "KavachCell",
+            parent=self.styles["Normal"],
+            fontSize=8,
+            textColor=KAVACH_DARK,
+            leading=9.5,
+            spaceAfter=0,
+        ))
+        self.styles.add(ParagraphStyle(
+            "KavachCellTiny",
+            parent=self.styles["Normal"],
+            fontSize=7.5,
+            textColor=KAVACH_DARK,
+            leading=9,
+            spaceAfter=0,
+        ))
+        self.styles.add(ParagraphStyle(
+            "KavachCellCenter",
+            parent=self.styles["Normal"],
+            fontSize=8.5,
+            textColor=KAVACH_DARK,
+            leading=10,
+            alignment=TA_CENTER,
+            spaceAfter=0,
+        ))
+        self.styles.add(ParagraphStyle(
             "KavachCode",
             parent=self.styles["Normal"],
             fontSize=8,
@@ -241,8 +282,8 @@ class KavachPDFReport:
         repo_name: str,
         brs_score: float,
         brs_risk_level: str,
-        zero_day_score: float,
-        zero_day_level: str,
+        attack_surface_exposure_score: float,
+        attack_surface_exposure_level: str,
         findings: list[dict],
         compliance_summary: dict,
         summary: dict,
@@ -271,12 +312,14 @@ class KavachPDFReport:
         # ── 2. Executive Summary ──
         story.extend(self._build_executive_summary(
             repo_name, brs_score, brs_risk_level,
-            zero_day_score, zero_day_level, summary, compliance_summary
+            attack_surface_exposure_score, attack_surface_exposure_level, summary, compliance_summary
         ))
         story.append(PageBreak())
 
         # ── 3. Threat Posture Overview ──
-        story.extend(self._build_threat_posture_overview(summary, brs_score, brs_risk_level, zero_day_score, zero_day_level))
+        story.extend(self._build_threat_posture_overview(
+            summary, brs_score, brs_risk_level, attack_surface_exposure_score, attack_surface_exposure_level
+        ))
         story.append(PageBreak())
 
         # ── 4. Regulatory Impact Analysis ──
@@ -389,24 +432,32 @@ class KavachPDFReport:
 
     def _build_executive_summary(
         self, repo_name, brs_score, brs_risk_level,
-        zero_day_score, zero_day_level, summary, compliance_summary
+        attack_surface_exposure_score, attack_surface_exposure_level, summary, compliance_summary
     ):
         elements = []
         elements.append(Paragraph("2. Executive Summary", self.styles["KavachH1"]))
         elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
 
-        # Core posture summary
-        posture_description = (
-            "CRITICAL EXPOSURE DETECTED. Immediate patch orchestration required." if brs_score >= 30 else
-            "ELEVATED THREAT LANDSCAPE. Remediation should be scheduled in the next active sprint." if brs_score >= 20 else
-            "STEADY SECURITY POSTURE. System metrics confirm high compliance alignment."
+        # Core posture summary — driven by the engine's own risk_level string
+        # (app/services/risk/brs_engine.py::_calculate_risk_level), not a
+        # second, independently-thresholded check on the raw score here.
+        # Two copies of the same cutoffs drift apart over time; one copy
+        # can't.
+        posture_description = {
+            "Critical": "CRITICAL EXPOSURE DETECTED. Immediate patch orchestration required.",
+            "High": "ELEVATED THREAT LANDSCAPE. Remediation should be scheduled in the next active sprint.",
+            "Medium": "MODERATE RISK POSTURE. Remediation should be prioritized in the current cycle.",
+        }.get(
+            brs_risk_level,
+            "STEADY SECURITY POSTURE. No findings requiring immediate action were detected — see the residual "
+            "uncertainty note below before reading this as a zero-risk guarantee.",
         )
 
         elements.append(Paragraph(
             f"<b>ASSESSMENT STATUS:</b> {posture_description}",
             self.styles["KavachBodyBold"]
         ))
-        
+
         intro = (
             f"KAVACH completed a banking security audit of repository <b>{repo_name}</b>. "
             f"The scanner performed static code parsing (SAST), software composition audit (SCA), "
@@ -426,8 +477,10 @@ class KavachPDFReport:
             f"represent immediate exploit vectors affecting banking logic, token authorization, or data integrity.<br/>"
             f"• <b>High Vulnerability Vectors:</b> {high_count} high-severity flaws were logged, predominantly affecting package dependencies.<br/>"
             f"• <b>Risk Class:</b> The system resides in a <b>{brs_risk_level}</b> risk tier with a BRS score of <b>{brs_score:.1f}</b>.<br/>"
-            f"• <b>Zero-Day Risk Factor:</b> Local dependencies and configuration audits yield a <b>{zero_day_score:.1f}%</b> probability "
-            f"of zero-day exploitation vulnerability."
+            f"• <b>Attack Surface Exposure:</b> Dependency footprint, patch hygiene, and configuration audits yield an exposure "
+            f"index of <b>{attack_surface_exposure_score:.1f}/100</b> ({attack_surface_exposure_level}) — a composite measure of "
+            f"factors correlated with undiscovered-vulnerability risk (dependency count, CVE density, staleness, risky "
+            f"package categories, configuration risk), not a probability or prediction of any specific future exploit."
         )
         elements.append(Paragraph(observations, self.styles["KavachBody"]))
         elements.append(Spacer(1, 0.4 * cm))
@@ -435,25 +488,36 @@ class KavachPDFReport:
         # Risk Level Explanation
         elements.append(Paragraph("Risk Score Model Explanation", self.styles["KavachH2"]))
         explanation = (
-            "The Banking Risk Score (BRS) is a weighted calculation reflecting vulnerability severity, cvss values, and regulatory "
-            "compliance mapping. BRS values above 30 denote Critical Risk (immediate remediation mandatory). BRS values between 20-30 "
-            "denote High Risk (CISO review and mitigation within 7 days). BRS values below 20 denote low-to-medium posture alerts."
+            "The Banking Risk Score (BRS) is a weighted calculation reflecting vulnerability severity, CVSS values, business "
+            "module criticality, internet exposure, regulatory compliance impact, and historical incident context. BRS values "
+            "of 82 and above denote Critical risk (immediate remediation mandatory); 58-81 denote High risk (review and "
+            "mitigation within days); 35-57 denote Medium risk; below 35 denotes Low risk. A scan reporting zero findings is "
+            "never scored as a literal zero: no static/dependency/secrets scan pipeline can rule out every class of "
+            "vulnerability, so a small residual baseline (typically 4-8) is retained to represent that irreducible "
+            "uncertainty rather than overclaiming a provably secure result."
         )
         elements.append(Paragraph(explanation, self.styles["KavachBody"]))
 
         return elements
 
-    def _build_threat_posture_overview(self, summary, brs_score, brs_risk_level, zero_day_score, zero_day_level):
+    def _build_threat_posture_overview(
+        self, summary, brs_score, brs_risk_level, attack_surface_exposure_score, attack_surface_exposure_level
+    ):
         elements = []
         elements.append(Paragraph("3. Threat Posture Overview", self.styles["KavachH1"]))
         elements.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=10))
 
-        # BRS / Zero Day Overview table
+        # BRS / Attack Surface Exposure overview table
         elements.append(Paragraph("Banking Risk Scorecard", self.styles["KavachH2"]))
         score_data = [
             ["Vulnerability Metric", "Score Value", "Rating Tier", "Mitigation Status"],
             ["Banking Risk Score (BRS)", f"{brs_score:.1f}", brs_risk_level.upper(), "Pending Patch"],
-            ["Zero-Day Risk Forecast", f"{zero_day_score:.1f}%", zero_day_level.upper(), "Review Advisory"],
+            [
+                "Attack Surface Exposure",
+                f"{attack_surface_exposure_score:.1f}/100",
+                attack_surface_exposure_level.upper(),
+                "Review Advisory",
+            ],
         ]
         score_table = Table(score_data, colWidths=[6.5 * cm, 3.5 * cm, 3.5 * cm, 3.5 * cm])
         score_table.setStyle(TableStyle([
@@ -524,7 +588,7 @@ class KavachPDFReport:
         for key, data in compliance_summary.items():
             status = "COMPLIANT" if data["compliant"] else "NON-COMPLIANT"
             table_data.append([
-                data["name"],
+                Paragraph(_esc(data["name"]), self.styles["KavachCellCenter"]),
                 str(data["violations"]),
                 status,
             ])
@@ -570,7 +634,7 @@ class KavachPDFReport:
             for f in violations:
                 comp = f.get("compliance", {})
                 elements.append(Paragraph(
-                    f"• <b>[{f.get('severity', '')}] {f.get('title', '')}</b>",
+                    f"• <b>[{f.get('severity', '')}] {_esc(f.get('title', ''))}</b>",
                     self.styles["KavachBody"]
                 ))
                 clauses = []
@@ -626,14 +690,18 @@ class KavachPDFReport:
         for idx, f in enumerate(critical_findings, 1):
             sev_color = SEVERITY_COLORS.get(f.get("severity", "").upper(), KAVACH_MUTED)
             elements.append(Paragraph(
-                f"Finding #{idx}: <b>{f.get('title', '')}</b>",
+                f"Finding #{idx}: <b>{_esc(f.get('title', ''))}</b>",
                 ParagraphStyle("det_title", fontSize=11, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
             ))
 
             # Metadata Table
+            # NOTE: file_path is unbounded scanner-provided data — it must be a
+            # Paragraph (word-wraps, grows row height) rather than a raw string,
+            # or ReportLab draws it as one long line straight over the neighboring
+            # column. The other cells here are short, fixed-vocabulary values.
             meta_data = [
                 ["Severity:", f.get("severity", "").upper(), "CVSS Score:", f"{f.get('cvss', 0.0):.1f}"],
-                ["Location:", f.get("file_path") or "Dependencies", "Line:", str(f.get("line_number") or "N/A")],
+                ["Location:", Paragraph(_esc(f.get("file_path") or "Dependencies"), self.styles["KavachCell"]), "Line:", str(f.get("line_number") or "N/A")],
             ]
             meta_table = Table(meta_data, colWidths=[2.5 * cm, 6 * cm, 2.5 * cm, 6 * cm])
             meta_table.setStyle(TableStyle([
@@ -650,14 +718,14 @@ class KavachPDFReport:
             elements.append(Spacer(1, 0.15 * cm))
 
             elements.append(Paragraph(
-                f"<b>Description:</b> {f.get('description', '')}",
+                f"<b>Description:</b> {_esc(f.get('description', ''))}",
                 self.styles["KavachBody"]
             ))
 
             # Business Impact
             biz_impact = f.get('ai_business_impact') or "Threatens the operational continuity of banking microservices."
             elements.append(Paragraph(
-                f"<b>Business Impact:</b> {biz_impact}",
+                f"<b>Business Impact:</b> {_esc(biz_impact)}",
                 self.styles["KavachBody"]
             ))
 
@@ -671,7 +739,7 @@ class KavachPDFReport:
             # Remediation
             remediation = f.get('ai_remediation') or "Please consult secure coding rules to fix this vulnerability."
             elements.append(Paragraph(
-                f"<b>Remediation:</b> {remediation}",
+                f"<b>Remediation:</b> {_esc(remediation)}",
                 self.styles["KavachBody"]
             ))
 
@@ -712,14 +780,14 @@ class KavachPDFReport:
 
         for idx, f in enumerate(target_findings, 1):
             elements.append(Paragraph(
-                f"Analyst Insight #{idx}: <b>{f.get('title', '')}</b>",
+                f"Analyst Insight #{idx}: <b>{_esc(f.get('title', ''))}</b>",
                 ParagraphStyle("ai_title", fontSize=10.5, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
             ))
 
             # Threat Analysis
             threat_analysis = f.get("ai_explanation") or "Automated vulnerability scanner identified potential exposure."
-            
-            # Attack Scenario
+
+            # Attack Scenario (hardcoded strings from _generate_attack_scenario — no user data, no escaping needed)
             attack_scenario = self._generate_attack_scenario(f)
 
             # Risk Explanation
@@ -731,10 +799,10 @@ class KavachPDFReport:
             # AI Security Analyst Commentary Box
             ai_data = [
                 [Paragraph("<b>AI Security Analyst Commentary</b>", ParagraphStyle("ai_h", fontSize=8.5, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569")))],
-                [Paragraph(f"<b>Threat Analysis:</b> {threat_analysis}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Threat Analysis:</b> {_esc(threat_analysis)}", self.styles["KavachSmall"])],
                 [Paragraph(f"<b>Attack Scenario:</b> {attack_scenario}", self.styles["KavachSmall"])],
-                [Paragraph(f"<b>Risk Explanation:</b> {risk_explanation}", self.styles["KavachSmall"])],
-                [Paragraph(f"<b>Recommended Action:</b> {recommended_action}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Risk Explanation:</b> {_esc(risk_explanation)}", self.styles["KavachSmall"])],
+                [Paragraph(f"<b>Recommended Action:</b> {_esc(recommended_action)}", self.styles["KavachSmall"])],
             ]
             ai_table = Table(ai_data, colWidths=[17 * cm])
             ai_table.setStyle(TableStyle([
@@ -776,7 +844,7 @@ class KavachPDFReport:
 
         elements.append(Paragraph("<b>PRIORITY 2: Dependency & Configuration Patching (SLA: 7 Days)</b>", self.styles["KavachH2"]))
         if highs:
-            p2_desc = f"Update the {len(highs)} outdated packages and libraries identified in the dependency audit. Focus on libraries mapped to CVEs and zero-day forecast vectors."
+            p2_desc = f"Update the {len(highs)} outdated packages and libraries identified in the dependency audit. Focus on libraries with confirmed CVEs and high attack-surface exposure."
         else:
             p2_desc = "Evaluate and patch any medium-severity code issues and config files flagged in the latest scanner run."
         elements.append(Paragraph(p2_desc, self.styles["KavachBody"]))
@@ -1028,17 +1096,24 @@ class KavachTechnicalPDFReport:
         sev_hex = SEVERITY_HEX.get(sev, "#64748B")
         elements = [
             Paragraph(
-                f"#{idx} &nbsp; <font color='{sev_hex}'>[{sev}]</font> <b>{f.get('title', '')}</b>",
+                f"#{idx} &nbsp; <font color='{sev_hex}'>[{sev}]</font> <b>{_esc(f.get('title', ''))}</b>",
                 ParagraphStyle("tf_title", fontSize=10.5, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=10, spaceAfter=4),
             )
         ]
 
+        # NOTE: category/module/file_path/sources/CWE/OWASP are unbounded
+        # scanner-provided strings — each is wrapped in a Paragraph (word-wraps,
+        # grows row height) rather than passed as a raw string, or ReportLab
+        # draws it as one long line straight over the neighboring column. The
+        # label cells and CVSS/BRS/line-number values are short & fixed, so
+        # they stay as plain strings.
+        cell = self.styles["KavachCellTiny"]
         meta_rows = [
             ["CVSS:", f"{f.get('cvss', 0.0):.1f}", "BRS:", f"{f.get('brs', 0.0):.1f}"],
-            ["Category:", f.get("category", "") or "N/A", "Module:", f.get("module", "") or "unclassified"],
-            ["File:", f.get("file_path") or "Dependency", "Line:", str(f.get("line_number") or "N/A")],
-            ["Source(s):", "|".join(f.get("sources") or [f.get("source", "")]), "CWE:", f.get("cwe_id") or "N/A"],
-            ["OWASP:", f.get("owasp_category") or "N/A", "", ""],
+            ["Category:", Paragraph(_esc(f.get("category", "") or "N/A"), cell), "Module:", Paragraph(_esc(f.get("module", "") or "unclassified"), cell)],
+            ["File:", Paragraph(_esc(f.get("file_path") or "Dependency"), cell), "Line:", str(f.get("line_number") or "N/A")],
+            ["Source(s):", Paragraph(_esc("|".join(f.get("sources") or [f.get("source", "")])), cell), "CWE:", Paragraph(_esc(f.get("cwe_id") or "N/A"), cell)],
+            ["OWASP:", Paragraph(_esc(f.get("owasp_category") or "N/A"), cell), "", ""],
         ]
         meta_table = Table(meta_rows, colWidths=[2.2 * cm, 6.3 * cm, 2.2 * cm, 6.3 * cm])
         meta_table.setStyle(TableStyle([
@@ -1052,7 +1127,7 @@ class KavachTechnicalPDFReport:
         elements.append(meta_table)
         elements.append(Spacer(1, 0.1 * cm))
 
-        elements.append(Paragraph(f"<b>Description:</b> {f.get('description', '')}", self.styles["KavachSmall"]))
+        elements.append(Paragraph(f"<b>Description:</b> {_esc(f.get('description', ''))}", self.styles["KavachSmall"]))
 
         compliance = f.get("compliance") or {}
         if compliance:
@@ -1065,7 +1140,7 @@ class KavachTechnicalPDFReport:
                 elements.append(Paragraph(f"<b>Compliance:</b> {' | '.join(clauses)}", self.styles["KavachSmall"]))
 
         if f.get("ai_remediation"):
-            elements.append(Paragraph(f"<b>Remediation:</b> {f['ai_remediation']}", self.styles["KavachSmall"]))
+            elements.append(Paragraph(f"<b>Remediation:</b> {_esc(f['ai_remediation'])}", self.styles["KavachSmall"]))
 
         elements.append(Spacer(1, 0.25 * cm))
         return elements
@@ -1084,8 +1159,8 @@ class ReportContext:
     findings: list[dict]
     brs_score: float
     brs_risk_level: str
-    zero_day_score: float
-    zero_day_level: str
+    attack_surface_exposure_score: float
+    attack_surface_exposure_level: str
     compliance_summary: dict
     summary: dict
     sbom: Optional[dict]
@@ -1101,8 +1176,8 @@ def _build_pdf_executive(ctx: ReportContext, reports_dir: Path) -> Optional[Path
         repo_name=ctx.repo_name,
         brs_score=ctx.brs_score,
         brs_risk_level=ctx.brs_risk_level,
-        zero_day_score=ctx.zero_day_score,
-        zero_day_level=ctx.zero_day_level,
+        attack_surface_exposure_score=ctx.attack_surface_exposure_score,
+        attack_surface_exposure_level=ctx.attack_surface_exposure_level,
         findings=ctx.findings,
         compliance_summary=ctx.compliance_summary,
         summary=ctx.summary,
@@ -1177,8 +1252,8 @@ def generate_all_reports(
     findings: list[dict],
     brs_score: float,
     brs_risk_level: str,
-    zero_day_score: float,
-    zero_day_level: str,
+    attack_surface_exposure_score: float,
+    attack_surface_exposure_level: str,
     compliance_summary: dict,
     summary: dict,
     sbom: Optional[dict],
@@ -1209,8 +1284,8 @@ def generate_all_reports(
             repo_name=repo_name,
             brs_score=brs_score,
             brs_risk_level=brs_risk_level,
-            zero_day_score=zero_day_score,
-            zero_day_level=zero_day_level,
+            attack_surface_exposure_score=attack_surface_exposure_score,
+            attack_surface_exposure_level=attack_surface_exposure_level,
             findings=findings,
             compliance_summary=compliance_summary,
             summary=summary,
