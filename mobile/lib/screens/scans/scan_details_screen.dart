@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/rbac/permission.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../models/scan_job.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/scan_provider.dart';
+import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_indicator.dart';
+import '../../widgets/common/info_row.dart';
+import '../../widgets/common/section_header.dart';
 import '../../widgets/common/severity_badge.dart';
+import '../../widgets/common/skeleton_loaders.dart';
+import '../../widgets/common/stat_tile.dart';
+import '../../widgets/common/status_chip.dart';
 
 /// Real end-to-end screen: `GET /scan/{id}`. This is a point-in-time
 /// snapshot (pull to refresh) — live updates via the scan-progress
@@ -29,6 +38,7 @@ class ScanDetailsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan Details')),
       body: RefreshIndicator(
+        color: AppColors.primary,
         onRefresh: () => ref.refresh(scanJobDetailProvider(scanJobId).future),
         child: scanAsync.when(
           data: (scan) => _ScanDetailsBody(
@@ -36,7 +46,10 @@ class ScanDetailsScreen extends ConsumerWidget {
             canCancel: canCancel,
             onCancelled: () => ref.invalidate(scanJobDetailProvider(scanJobId)),
           ),
-          loading: () => const LoadingIndicator(),
+          loading: () => const Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: ListRowSkeleton(count: 3),
+          ),
           error: (error, stackTrace) => ErrorView(
             message: error.toString(),
             onRetry: () => ref.invalidate(scanJobDetailProvider(scanJobId)),
@@ -72,12 +85,43 @@ class _ScanDetailsBodyState extends ConsumerState<_ScanDetailsBody> {
       widget.onCancelled();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        AppSnackbar.error(context, e.toString());
       }
     } finally {
       if (mounted) setState(() => _isCancelling = false);
+    }
+  }
+
+  Future<void> _confirmCancel() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.cardRadius,
+          side: const BorderSide(color: AppColors.border),
+        ),
+        title: const Text('Cancel this scan?'),
+        content: const Text(
+          'The scan will stop immediately and its progress will be lost. '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep running'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Cancel scan'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      HapticFeedback.mediumImpact();
+      await _cancel();
     }
   }
 
@@ -87,97 +131,117 @@ class _ScanDetailsBodyState extends ConsumerState<_ScanDetailsBody> {
   @override
   Widget build(BuildContext context) {
     final scan = widget.scan;
+    final textTheme = Theme.of(context).textTheme;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        Text(scan.repositoryName, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
+        Text(scan.repositoryName, style: textTheme.headlineSmall),
+        const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
-            _StatusChip(status: scan.status),
-            const SizedBox(width: 8),
-            Text(
-              'Priority: ${scan.priority}',
-              style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
-            ),
+            StatusChip(status: scan.status),
+            const SizedBox(width: AppSpacing.sm),
+            Text('Priority: ${scan.priority}', style: textTheme.bodySmall),
           ],
         ),
         if (scan.status == 'running') ...[
-          const SizedBox(height: 12),
-          LinearProgressIndicator(value: scan.progressPercent / 100),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.md),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: scan.progressPercent / 100,
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             scan.currentStage ?? '${scan.progressPercent}%',
-            style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+            style: textTheme.bodySmall,
           ),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         AppCard(
           child: Column(
             children: [
-              _InfoRow(label: 'Queued', value: _formatDate(scan.queuedAt)),
-              _InfoRow(label: 'Started', value: _formatDate(scan.startedAt)),
-              _InfoRow(label: 'Finished', value: _formatDate(scan.finishedAt)),
-              _InfoRow(
-                label: 'Retries',
-                value: '${scan.retryCount} / ${scan.maxRetries}',
-              ),
+              InfoRow(label: 'Queued', value: _formatDate(scan.queuedAt), showDivider: true),
+              InfoRow(label: 'Started', value: _formatDate(scan.startedAt), showDivider: true),
+              InfoRow(label: 'Finished', value: _formatDate(scan.finishedAt), showDivider: true),
+              InfoRow(label: 'Retries', value: '${scan.retryCount} / ${scan.maxRetries}'),
             ],
           ),
         ),
         if (scan.brsScore != null || scan.totalFindings != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
               if (scan.brsScore != null)
                 Expanded(
-                  child: _StatTile(
+                  child: StatTile(
                     label: 'BRS score',
                     value: scan.brsScore!.toStringAsFixed(1),
+                    icon: Icons.speed_outlined,
                     trailing: scan.brsRiskLevel != null
                         ? SeverityBadge(severity: scan.brsRiskLevel!)
                         : null,
                   ),
                 ),
               if (scan.brsScore != null && scan.totalFindings != null)
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
               if (scan.totalFindings != null)
                 Expanded(
-                  child: _StatTile(
+                  child: StatTile(
                     label: 'Findings',
                     value: '${scan.totalFindings}',
+                    icon: Icons.bug_report_outlined,
                   ),
                 ),
             ],
           ),
         ],
         if (scan.errorMessage != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           AppCard(
-            child: Text(
-              scan.errorMessage!,
-              style: const TextStyle(color: AppColors.danger),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    scan.errorMessage!,
+                    style: textTheme.bodyMedium?.copyWith(color: AppColors.danger),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
         if (scan.workerStatus.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('Scanner engines', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.lg),
+          SectionHeader(title: 'Scanner engines'),
+          const SizedBox(height: AppSpacing.sm),
           AppCard(
             child: Column(
               children: [
                 for (final entry in scan.workerStatus.entries)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(entry.key, style: const TextStyle(color: AppColors.foreground)),
-                        Text(
-                          entry.value.status,
-                          style: const TextStyle(color: AppColors.mutedForeground),
+                        Text(entry.key, style: textTheme.bodyMedium),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _workerStatusIcon(entry.value.status),
+                              size: 14,
+                              color: _workerStatusColor(entry.value.status),
+                            ),
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(entry.value.status, style: textTheme.bodySmall),
+                          ],
                         ),
                       ],
                     ),
@@ -187,32 +251,33 @@ class _ScanDetailsBodyState extends ConsumerState<_ScanDetailsBody> {
           ),
         ],
         if (widget.canCancel && _isCancellable) ...[
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _isCancelling ? null : _cancel,
-            icon: const Icon(Icons.cancel_outlined, color: AppColors.danger),
-            label: Text(
-              _isCancelling ? 'Cancelling…' : 'Cancel scan',
-              style: const TextStyle(color: AppColors.danger),
-            ),
+          const SizedBox(height: AppSpacing.xxl),
+          AppButton(
+            label: 'Cancel scan',
+            icon: Icons.cancel_outlined,
+            variant: AppButtonVariant.destructive,
+            isBusy: _isCancelling,
+            onPressed: _confirmCancel,
           ),
         ],
       ],
     );
   }
 
-  String _formatDate(DateTime? date) {
-    if (date == null) return '—';
-    return DateFormat.yMMMd().add_jm().format(date);
+  IconData _workerStatusIcon(String status) {
+    switch (status) {
+      case 'completed':
+        return Icons.check_circle_outline;
+      case 'failed':
+        return Icons.error_outline;
+      case 'running':
+        return Icons.autorenew;
+      default:
+        return Icons.schedule_outlined;
+    }
   }
-}
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.status});
-
-  final String status;
-
-  Color get _color {
+  Color _workerStatusColor(String status) {
     switch (status) {
       case 'completed':
         return AppColors.success;
@@ -220,80 +285,13 @@ class _StatusChip extends StatelessWidget {
         return AppColors.danger;
       case 'running':
         return AppColors.primary;
-      case 'cancelled':
-        return AppColors.mutedForeground;
       default:
-        return AppColors.warning;
+        return AppColors.mutedForeground;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: _color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        status,
-        style: TextStyle(color: _color, fontSize: 11, fontWeight: FontWeight.w600),
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.mutedForeground)),
-          Text(value, style: const TextStyle(color: AppColors.foreground)),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value, this.trailing});
-
-  final String label;
-  final String value;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.foreground,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (trailing != null) ...[const SizedBox(width: 8), trailing!],
-            ],
-          ),
-        ],
-      ),
-    );
+  String _formatDate(DateTime? date) {
+    if (date == null) return '—';
+    return DateFormat.yMMMd().add_jm().format(date);
   }
 }

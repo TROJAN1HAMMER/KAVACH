@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_spacing.dart';
 
 /// Used both for genuine "nothing here yet" states and for this milestone's
 /// screen placeholders ("Coming soon — wired to the backend in the next
@@ -23,26 +26,31 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.muted,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.accent.withValues(alpha: 0.6),
+                    AppColors.muted,
+                  ],
+                ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 32, color: AppColors.mutedForeground),
+              child: Icon(icon, size: 32, color: AppColors.accentForeground),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             if (message != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: AppSpacing.xs + 2),
               Text(
                 message!,
                 textAlign: TextAlign.center,
@@ -50,12 +58,17 @@ class EmptyState extends StatelessWidget {
               ),
             ],
             if (action != null) ...[
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               action!,
             ],
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: AppMotion.slow, curve: AppMotion.entranceCurve).scaleXY(
+          begin: 0.96,
+          end: 1,
+          duration: AppMotion.slow,
+          curve: AppMotion.entranceCurve,
+        );
   }
 }

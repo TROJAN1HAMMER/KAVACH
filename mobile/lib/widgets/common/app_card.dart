@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../core/theme/app_radii.dart';
 
 /// Thin wrapper so every screen gets the themed `CardTheme` (see
 /// `core/theme/app_theme.dart`) with consistent internal padding, matching
 /// the web app's flat `bg-card` + 1px border + `rounded-xl` language (no
 /// glassmorphism on ordinary cards — see the theme research notes).
+///
+/// When [onTap] is set, adds a light haptic tap and a themed ripple —
+/// same tap target as before, just with feedback.
 class AppCard extends StatelessWidget {
   const AppCard({
     required this.child,
@@ -18,16 +24,16 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final card = Card(
-      child: Padding(padding: padding, child: child),
-    );
     if (onTap == null) {
-      return card;
+      return Card(child: Padding(padding: padding, child: child));
     }
     return Card(
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap!();
+        },
+        borderRadius: AppRadii.cardRadius,
         child: Padding(padding: padding, child: child),
       ),
     );

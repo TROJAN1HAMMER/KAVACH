@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import 'nav_items.dart';
 
@@ -12,7 +15,7 @@ import 'nav_items.dart';
 /// rail) plus a bottom nav bar with the four most-used destinations on
 /// narrow (phone) widths. Wraps every route inside the app's `ShellRoute` —
 /// see `core/router/app_router.dart`.
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({required this.currentPath, required this.child, super.key});
 
   final String currentPath;
@@ -21,59 +24,94 @@ class MainShell extends ConsumerWidget {
   static const double _wideBreakpoint = 720;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell> {
+  bool _elevated = false;
+
+  void _handleScrollNotification(ScrollNotification notification) {
+    final bool shouldElevate = notification.metrics.pixels > 4;
+    if (shouldElevate != _elevated) {
+      setState(() => _elevated = shouldElevate);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final role = ref.watch(currentUserRoleProvider);
     final visibleItems = kNavItems
         .where((item) => ref.watch(routeAccessProvider(item.routeKey)))
         .toList();
 
-    final bool isWide = MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+    final bool isWide = MediaQuery.sizeOf(context).width >= MainShell._wideBreakpoint;
 
     final visibleBottomItems = visibleItems
         .where((item) => kBottomNavRouteKeys.contains(item.routeKey))
         .toList();
     final int bottomIndex = visibleBottomItems.indexWhere(
-      (item) => item.path == currentPath,
+      (item) => item.path == widget.currentPath,
     );
 
     final drawer = _NavDrawer(
       items: visibleItems,
-      currentPath: currentPath,
+      currentPath: widget.currentPath,
       roleLabel: role?.wireValue,
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('KAVACH'),
-        leading: isWide
-            ? null
-            : Builder(
-                builder: (context) => IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
+      appBar: _ElevatedAppBar(
+        elevated: _elevated,
+        appBar: AppBar(
+          title: const Text('KAVACH'),
+          leading: isWide
+              ? null
+              : Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu),
+                    tooltip: 'Open navigation',
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      Scaffold.of(context).openDrawer();
+                    },
+                  ),
                 ),
-              ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profile',
-            onPressed: () => context.go(RoutePaths.profile),
-          ),
-        ],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person_outline),
+              tooltip: 'Profile',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                context.go(RoutePaths.profile);
+              },
+            ),
+          ],
+        ),
       ),
       drawer: isWide ? null : drawer,
       body: Row(
         children: [
           if (isWide) SizedBox(width: 260, child: drawer),
           if (isWide) const VerticalDivider(width: 1, color: AppColors.border),
-          Expanded(child: child),
+          Expanded(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                _handleScrollNotification(notification);
+                return false;
+              },
+              child: widget.child,
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: isWide || visibleBottomItems.isEmpty
           ? null
           : BottomNavigationBar(
               currentIndex: bottomIndex < 0 ? 0 : bottomIndex,
-              onTap: (index) => context.go(visibleBottomItems[index].path),
+              onTap: (index) {
+                HapticFeedback.selectionClick();
+                context.go(visibleBottomItems[index].path);
+              },
               items: [
                 for (final item in visibleBottomItems)
                   BottomNavigationBarItem(
@@ -82,6 +120,39 @@ class MainShell extends ConsumerWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// Adds a subtle drop shadow once the body scrolls past the top — a small
+/// depth cue distinguishing "content behind the bar" from "content flush
+/// with it," instead of the flat `elevation: 0` bar staying identical
+/// regardless of scroll position.
+class _ElevatedAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _ElevatedAppBar({required this.elevated, required this.appBar});
+
+  final bool elevated;
+  final AppBar appBar;
+
+  @override
+  Size get preferredSize => appBar.preferredSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: AppMotion.fast,
+      decoration: BoxDecoration(
+        boxShadow: elevated
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : const [],
+      ),
+      child: appBar,
     );
   }
 }
@@ -107,41 +178,49 @@ class _NavDrawer extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.accent, AppColors.card],
+                ),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.shield, color: AppColors.primary),
-                      SizedBox(width: 8),
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                        ),
+                        child: const Icon(Icons.shield, color: AppColors.primary, size: 18),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
                       Text(
                         'KAVACH',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.foreground,
-                        ),
+                        style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ],
                   ),
                   if (user != null) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     Text(
                       user.fullName ?? user.email,
-                      style: const TextStyle(
-                        color: AppColors.foreground,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       user.roleDisplayName,
-                      style: const TextStyle(
-                        color: AppColors.mutedForeground,
-                        fontSize: 12,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 ],
@@ -150,7 +229,7 @@ class _NavDrawer extends ConsumerWidget {
             const Divider(height: 1),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                 children: [
                   for (final item in items)
                     _DrawerTile(
@@ -167,9 +246,12 @@ class _NavDrawer extends ConsumerWidget {
                 'Log out',
                 style: TextStyle(color: AppColors.danger),
               ),
-              onTap: () => ref.read(authProvider.notifier).logout(),
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ref.read(authProvider.notifier).logout();
+              },
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
           ],
         ),
       ),
@@ -185,27 +267,37 @@ class _DrawerTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(
-        item.icon,
-        color: selected ? AppColors.primary : AppColors.mutedForeground,
-      ),
-      title: Text(
-        item.label,
-        style: TextStyle(
-          color: selected ? AppColors.primary : AppColors.foreground,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
+      child: AnimatedContainer(
+        duration: AppMotion.fast,
+        curve: AppMotion.switchCurve,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: ListTile(
+          leading: Icon(
+            item.icon,
+            color: selected ? AppColors.primary : AppColors.mutedForeground,
+          ),
+          title: Text(
+            item.label,
+            style: TextStyle(
+              color: selected ? AppColors.primary : AppColors.foreground,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            if (Scaffold.of(context).hasDrawer) {
+              Navigator.of(context).maybePop();
+            }
+            context.go(item.path);
+          },
         ),
       ),
-      selected: selected,
-      selectedTileColor: AppColors.accent,
-      shape: const RoundedRectangleBorder(),
-      onTap: () {
-        if (Scaffold.of(context).hasDrawer) {
-          Navigator.of(context).maybePop();
-        }
-        context.go(item.path);
-      },
     );
   }
 }

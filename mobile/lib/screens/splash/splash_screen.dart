@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/kavach_logo.dart';
 
@@ -26,18 +29,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            KavachLogo(iconSize: 56),
-            SizedBox(height: 24),
-            SizedBox(
+            const KavachLogo(iconSize: 56)
+                .animate()
+                .fadeIn(duration: AppMotion.slow, curve: AppMotion.entranceCurve)
+                .scaleXY(begin: 0.9, end: 1, duration: AppMotion.slow, curve: AppMotion.entranceCurve),
+            const SizedBox(height: AppSpacing.xxl),
+            const SizedBox(
               width: 24,
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2.5),
-            ),
+            ).animate(delay: AppMotion.medium).fadeIn(duration: AppMotion.medium),
           ],
         ),
       ),

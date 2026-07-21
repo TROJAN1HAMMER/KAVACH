@@ -26,8 +26,8 @@ class SeverityBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: 8,
+            height: 8,
             margin: const EdgeInsets.only(right: 6),
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),

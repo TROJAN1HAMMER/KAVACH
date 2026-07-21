@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/kavach_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -37,9 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
     if (!success && mounted) {
       final String? error = ref.read(authProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error ?? 'Login failed. Please try again.')),
-      );
+      AppSnackbar.error(context, error ?? 'Login failed. Please try again.');
     }
     // On success, `app_router.dart`'s redirect moves us to the role's
     // default route automatically once `AuthState.status` flips.
@@ -48,11 +51,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final bool isBusy = ref.watch(authProvider).isBusy;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxl, vertical: AppSpacing.xxxl),
           child: Form(
             key: _formKey,
             child: Column(
@@ -65,23 +69,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   icon: const Icon(Icons.arrow_back),
                   padding: EdgeInsets.zero,
                 ),
-                const SizedBox(height: 8),
-                const KavachLogo(),
-                const SizedBox(height: 28),
-                const Text(
-                  'Welcome back',
-                  style: TextStyle(
-                    color: AppColors.foreground,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
+                const SizedBox(height: AppSpacing.sm),
+                const KavachLogo(heroTag: KavachLogo.sharedHeroTag),
+                const SizedBox(height: AppSpacing.xxl + 4),
+                Text('Welcome back', style: textTheme.headlineSmall)
+                    .animate()
+                    .fadeIn(duration: AppMotion.medium, curve: AppMotion.entranceCurve)
+                    .slideY(begin: 0.08, end: 0, duration: AppMotion.medium, curve: AppMotion.entranceCurve),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
                   'Log in with your KAVACH account.',
-                  style: TextStyle(color: AppColors.mutedForeground),
-                ),
-                const SizedBox(height: 24),
+                  style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
+                ).animate(delay: AppMotion.fast).fadeIn(duration: AppMotion.medium),
+                const SizedBox(height: AppSpacing.xxl),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -99,8 +99,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
+                ).animate(delay: AppMotion.medium).fadeIn(duration: AppMotion.medium),
+                const SizedBox(height: AppSpacing.lg),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -126,25 +126,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                   onFieldSubmitted: (_) => _submit(),
+                ).animate(delay: AppMotion.medium + AppMotion.fast).fadeIn(duration: AppMotion.medium),
+                const SizedBox(height: AppSpacing.xxl),
+                AppButton(
+                  label: 'Log In',
+                  expand: true,
+                  isBusy: isBusy,
+                  onPressed: _submit,
                 ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: isBusy ? null : _submit,
-                    child: isBusy
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.primaryForeground,
-                            ),
-                          )
-                        : const Text('Log In'),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Center(
                   child: TextButton(
                     onPressed: () => context.push(RoutePaths.signup),

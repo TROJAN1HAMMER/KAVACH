@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -26,6 +27,7 @@ import '../../screens/splash/splash_screen.dart';
 import '../../widgets/layout/main_shell.dart';
 import '../rbac/rbac.dart';
 import '../rbac/route_keys.dart';
+import '../theme/app_motion.dart';
 import 'route_paths.dart';
 
 /// Notifies `GoRouter` to re-run `redirect` whenever [AuthNotifier]'s state
@@ -85,6 +87,35 @@ RouteKey? _routeKeyForLocation(String location) {
   }
 }
 
+/// Wraps every route's screen in the same subtle fade+slide transition
+/// (using the app-wide [AppMotion] timing) instead of go_router's default
+/// abrupt platform transition — purely a presentation change, the route's
+/// path/builder-content/redirect behavior is untouched.
+CustomTransitionPage<void> _transitionPage(GoRouterState state, Widget child) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: AppMotion.medium,
+    reverseTransitionDuration: AppMotion.medium,
+    child: child,
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final CurvedAnimation curved = CurvedAnimation(
+        parent: animation,
+        curve: AppMotion.entranceCurve,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.03),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
 final goRouterProvider = Provider<GoRouter>((ref) {
   final refreshListenable = _RouterRefreshListenable(ref);
 
@@ -120,19 +151,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: RoutePaths.splash,
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _transitionPage(state, const SplashScreen()),
       ),
       GoRoute(
         path: RoutePaths.landing,
-        builder: (context, state) => const LandingScreen(),
+        pageBuilder: (context, state) => _transitionPage(state, const LandingScreen()),
       ),
       GoRoute(
         path: RoutePaths.login,
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => _transitionPage(state, const LoginScreen()),
       ),
       GoRoute(
         path: RoutePaths.signup,
-        builder: (context, state) => const SignupScreen(),
+        pageBuilder: (context, state) => _transitionPage(state, const SignupScreen()),
       ),
       ShellRoute(
         builder: (context, state, child) {
@@ -141,71 +172,75 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: RoutePaths.dashboard,
-            builder: (context, state) => const DashboardScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const DashboardScreen()),
           ),
           GoRoute(
             path: RoutePaths.repositories,
-            builder: (context, state) => const RepositoriesScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const RepositoriesScreen()),
           ),
           GoRoute(
             path: RoutePaths.repositoryDetails,
-            builder: (context, state) => RepositoryDetailsScreen(
-              repositoryId: state.pathParameters['repositoryId']!,
+            pageBuilder: (context, state) => _transitionPage(
+              state,
+              RepositoryDetailsScreen(
+                repositoryId: state.pathParameters['repositoryId']!,
+              ),
             ),
           ),
           GoRoute(
             path: RoutePaths.startScan,
-            builder: (context, state) => const StartScanScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const StartScanScreen()),
           ),
           GoRoute(
             path: RoutePaths.scanQueue,
-            builder: (context, state) => const ScanQueueScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ScanQueueScreen()),
           ),
           GoRoute(
             path: RoutePaths.scanDetails,
-            builder: (context, state) => ScanDetailsScreen(
-              scanJobId: state.pathParameters['scanJobId']!,
+            pageBuilder: (context, state) => _transitionPage(
+              state,
+              ScanDetailsScreen(scanJobId: state.pathParameters['scanJobId']!),
             ),
           ),
           GoRoute(
             path: RoutePaths.risk,
-            builder: (context, state) => const RiskDashboardScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const RiskDashboardScreen()),
           ),
           GoRoute(
             path: RoutePaths.findings,
-            builder: (context, state) => const FindingExplorerScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const FindingExplorerScreen()),
           ),
           GoRoute(
             path: RoutePaths.compliance,
-            builder: (context, state) => const ComplianceScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ComplianceScreen()),
           ),
           GoRoute(
             path: RoutePaths.reports,
-            builder: (context, state) => const ReportsScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ReportsScreen()),
           ),
           GoRoute(
             path: RoutePaths.executive,
-            builder: (context, state) => const ExecutiveSummaryScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ExecutiveSummaryScreen()),
           ),
           GoRoute(
             path: RoutePaths.architecture,
-            builder: (context, state) => const ArchitectureScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ArchitectureScreen()),
           ),
           GoRoute(
             path: RoutePaths.notifications,
-            builder: (context, state) => const NotificationsScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const NotificationsScreen()),
           ),
           GoRoute(
             path: RoutePaths.profile,
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const ProfileScreen()),
           ),
           GoRoute(
             path: RoutePaths.settings,
-            builder: (context, state) => const SettingsScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const SettingsScreen()),
           ),
           GoRoute(
             path: RoutePaths.about,
-            builder: (context, state) => const AboutScreen(),
+            pageBuilder: (context, state) => _transitionPage(state, const AboutScreen()),
           ),
         ],
       ),

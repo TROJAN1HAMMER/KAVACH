@@ -7,10 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/router/route_paths.dart';
-import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/repositories_provider.dart';
 import '../../providers/scan_provider.dart';
+import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_snackbar.dart';
 
 enum _ScanSource { zipUpload, repositoryUrl }
 
@@ -104,7 +106,7 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
   void _showError(String message) {
     setState(() => _isSubmitting = false);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      AppSnackbar.error(context, message);
     }
   }
 
@@ -114,7 +116,8 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
       appBar: AppBar(title: const Text('Start Scan')),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
             SegmentedButton<_ScanSource>(
               segments: const [
@@ -133,7 +136,7 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
               onSelectionChanged: (selection) =>
                   setState(() => _source = selection.first),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             if (_source == _ScanSource.repositoryUrl) ...[
               TextField(
                 controller: _urlController,
@@ -143,7 +146,7 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
                   prefixIcon: Icon(Icons.storage_outlined),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               TextField(
                 controller: _refController,
                 decoration: const InputDecoration(
@@ -152,15 +155,16 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
                 ),
               ),
             ] else ...[
-              OutlinedButton.icon(
+              AppButton(
+                label: _pickedZip?.name ?? 'Choose .zip file',
+                icon: Icons.attach_file,
+                variant: AppButtonVariant.outlined,
                 onPressed: _pickZip,
-                icon: const Icon(Icons.attach_file),
-                label: Text(_pickedZip?.name ?? 'Choose .zip file'),
               ),
             ],
-            const SizedBox(height: 20),
-            const Text('Priority', style: TextStyle(color: AppColors.mutedForeground)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xl),
+            Text('Priority', style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: AppSpacing.sm),
             SegmentedButton<String>(
               segments: const [
                 ButtonSegment(value: 'low', label: Text('Low')),
@@ -171,22 +175,12 @@ class _StartScanScreenState extends ConsumerState<StartScanScreen> {
               onSelectionChanged: (selection) =>
                   setState(() => _priority = selection.first),
             ),
-            const SizedBox(height: 28),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.primaryForeground,
-                        ),
-                      )
-                    : const Text('Start Scan'),
-              ),
+            const SizedBox(height: AppSpacing.xxl),
+            AppButton(
+              label: 'Start Scan',
+              expand: true,
+              isBusy: _isSubmitting,
+              onPressed: _submit,
             ),
           ],
         ),

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/rbac/permission.dart';
 import '../../core/router/route_paths.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/app_radii.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/repositories_provider.dart';
 import '../../widgets/common/app_card.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_indicator.dart';
+import '../../widgets/common/skeleton_loaders.dart';
 
 /// Real end-to-end screen: `GET /repositories`.
 class RepositoriesScreen extends ConsumerWidget {
@@ -30,11 +34,13 @@ class RepositoriesScreen extends ConsumerWidget {
             )
           : null,
       body: RefreshIndicator(
+        color: AppColors.primary,
         onRefresh: () => ref.refresh(repositoriesListProvider.future),
         child: reposAsync.when(
           data: (repos) {
             if (repos.isEmpty) {
               return ListView(
+                physics: const BouncingScrollPhysics(),
                 children: const [
                   SizedBox(height: 80),
                   EmptyState(
@@ -47,12 +53,13 @@ class RepositoriesScreen extends ConsumerWidget {
               );
             }
             return ListView.builder(
-              padding: const EdgeInsets.all(16),
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               itemCount: repos.length,
               itemBuilder: (context, index) {
                 final repo = repos[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                   child: AppCard(
                     onTap: () => context.go(
                       RoutePaths.repositoryDetailsPath(repo.id),
@@ -60,10 +67,10 @@ class RepositoriesScreen extends ConsumerWidget {
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: AppRadii.controlRadius,
                           ),
                           child: const Icon(
                             Icons.storage_outlined,
@@ -71,44 +78,49 @@ class RepositoriesScreen extends ConsumerWidget {
                             size: 18,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 repo.name,
-                                style: const TextStyle(
-                                  color: AppColors.foreground,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                repo.provider,
-                                style: const TextStyle(
-                                  color: AppColors.mutedForeground,
-                                  fontSize: 12,
-                                ),
-                              ),
+                              Text(repo.provider, style: Theme.of(context).textTheme.bodySmall),
                             ],
                           ),
                         ),
                         if (repo.scheduledScanEnabled)
-                          const Icon(
-                            Icons.schedule,
-                            size: 16,
-                            color: AppColors.mutedForeground,
+                          const Padding(
+                            padding: EdgeInsets.only(right: AppSpacing.xs),
+                            child: Icon(
+                              Icons.schedule,
+                              size: 16,
+                              color: AppColors.mutedForeground,
+                            ),
                           ),
                         const Icon(Icons.chevron_right, color: AppColors.mutedForeground),
                       ],
                     ),
                   ),
-                );
+                ).animate(delay: AppMotion.staggerStep * index).fadeIn(duration: AppMotion.medium).slideY(
+                      begin: 0.06,
+                      end: 0,
+                      duration: AppMotion.medium,
+                      curve: AppMotion.entranceCurve,
+                    );
               },
             );
           },
-          loading: () => const LoadingIndicator(),
+          loading: () => const Padding(
+            padding: EdgeInsets.all(AppSpacing.lg),
+            child: ListRowSkeleton(),
+          ),
           error: (error, stackTrace) => ErrorView(
             message: error.toString(),
             onRetry: () => ref.invalidate(repositoriesListProvider),

@@ -51,6 +51,15 @@ dependencies:
 
   cupertino_icons: ^1.0.8
 
+  # Typography (Inter, matching the web app's brand typeface)
+  google_fonts: ^6.2.1
+
+  # Declarative entrance/micro-interaction animations
+  flutter_animate: ^4.5.0
+
+  # Skeleton loading shimmer effect
+  shimmer: ^3.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_spacing.dart';
 import 'empty_state.dart';
 
 /// Shared shell for the screens this milestone scaffolds navigation-and-UI
@@ -32,7 +33,12 @@ class PlaceholderScreen extends StatelessWidget {
             title: title,
             message: message,
             action: actions != null
-                ? Wrap(spacing: 8, runSpacing: 8, children: actions!)
+                ? Wrap(
+                    spacing: AppSpacing.sm,
+                    runSpacing: AppSpacing.sm,
+                    alignment: WrapAlignment.center,
+                    children: actions!,
+                  )
                 : null,
           ),
         ),

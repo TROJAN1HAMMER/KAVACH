@@ -4,13 +4,15 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/rbac/permission.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_spacing.dart';
 import '../../models/repository.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../providers/repositories_provider.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/common/app_snackbar.dart';
 import '../../widgets/common/error_view.dart';
-import '../../widgets/common/loading_indicator.dart';
+import '../../widgets/common/info_row.dart';
+import '../../widgets/common/skeleton_loaders.dart';
 
 /// There is no `GET /repositories/{id}` on the backend — this looks the
 /// repository up from the already-fetched `GET /repositories` list rather
@@ -35,7 +37,10 @@ class RepositoryDetailsScreen extends ConsumerWidget {
           }
           return _RepositoryDetailsBody(repository: repo);
         },
-        loading: () => const LoadingIndicator(),
+        loading: () => const Padding(
+          padding: EdgeInsets.all(AppSpacing.lg),
+          child: ListRowSkeleton(count: 2),
+        ),
         error: (error, stackTrace) => ErrorView(
           message: error.toString(),
           onRetry: () => ref.invalidate(repositoriesListProvider),
@@ -68,9 +73,7 @@ class _RepositoryDetailsBodyState extends ConsumerState<_RepositoryDetailsBody> 
       ref.invalidate(repositoriesListProvider);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        AppSnackbar.error(context, e.toString());
       }
     } finally {
       if (mounted) setState(() => _isUpdating = false);
@@ -81,47 +84,45 @@ class _RepositoryDetailsBodyState extends ConsumerState<_RepositoryDetailsBody> 
   Widget build(BuildContext context) {
     final repo = widget.repository;
     final bool canWrite = hasPermission(ref, Permission.scanCreate);
+    final textTheme = Theme.of(context).textTheme;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
-        Text(repo.name, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 4),
+        Text(repo.name, style: textTheme.headlineSmall),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           repo.provider.toUpperCase(),
-          style: const TextStyle(color: AppColors.mutedForeground),
+          style: textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (repo.url != null)
-                _LinkRow(label: 'URL', url: repo.url!),
-              _InfoRow(label: 'Default branch', value: repo.defaultBranch ?? '—'),
+              if (repo.url != null) _LinkRow(label: 'URL', url: repo.url!),
+              InfoRow(label: 'Default branch', value: repo.defaultBranch ?? '—'),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         AppCard(
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Scheduled scans',
-                      style: TextStyle(
-                        color: AppColors.foreground,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       'Automatically re-scan this repository on a recurring '
                       'schedule.',
-                      style: TextStyle(color: AppColors.mutedForeground, fontSize: 12),
+                      style: textTheme.bodySmall,
                     ),
                   ],
                 ),
@@ -145,27 +146,6 @@ class _RepositoryDetailsBodyState extends ConsumerState<_RepositoryDetailsBody> 
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: AppColors.mutedForeground)),
-          Text(value, style: const TextStyle(color: AppColors.foreground)),
-        ],
-      ),
-    );
-  }
-}
-
 class _LinkRow extends StatelessWidget {
   const _LinkRow({required this.label, required this.url});
 
@@ -175,11 +155,11 @@ class _LinkRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(color: AppColors.mutedForeground)),
-          const SizedBox(width: 8),
+          Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.mutedForeground)),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: InkWell(
               onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
