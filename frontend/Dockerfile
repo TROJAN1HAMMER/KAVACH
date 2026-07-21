@@ -34,5 +34,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 8080
 
+# `127.0.0.1`, not `localhost`: this image's /etc/hosts resolves
+# "localhost" to the IPv6 loopback (::1) first, but nginx's `listen 8080;`
+# only binds IPv4 — wget would try ::1, get connection-refused, and never
+# fall back to 127.0.0.1, permanently marking the container unhealthy
+# despite nginx serving real traffic correctly the whole time.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:8080/healthz || exit 1
+    CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

@@ -1,5 +1,4 @@
 import { NavLink } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Activity,
   BarChart3,
@@ -9,10 +8,10 @@ import {
   Gauge,
   Home,
   ListChecks,
+  Menu,
   Network,
   SearchCode,
   ShieldAlert,
-  ShieldCheck,
   Sparkles,
   UserCog,
   Users,
@@ -41,74 +40,110 @@ const NAV_ITEMS: { to: string; label: string; icon: typeof Home; routeKey?: Rout
   { to: "/dashboard/architecture", label: "System Architecture", icon: Network, routeKey: "dashboard/architecture" },
 ];
 
-export function Sidebar({ mobileOpen, onCloseMobile }: { mobileOpen: boolean; onCloseMobile: () => void }) {
+/**
+ * Icon-only rail by default, at every screen size — the hamburger at the
+ * top expands it in place (pushing `<main>` over via normal flex reflow,
+ * see AppShell) to show labels, and collapses back on its own click, an
+ * Escape press, or picking a nav item. There is no overlay/backdrop and no
+ * off-canvas positioning: this is always a normal, always-visible flex
+ * child, just narrower or wider.
+ */
+export function Sidebar({
+  expanded,
+  onToggle,
+  onCollapse,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  onCollapse: () => void;
+}) {
   const { user } = useAuth();
-  const shouldReduceMotion = useReducedMotion();
   const visibleNavItems = NAV_ITEMS.filter(
     (item) => !item.routeKey || canAccessRoute(user?.role, item.routeKey),
   );
 
   return (
-    <>
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-            onClick={onCloseMobile}
-            aria-hidden
-            initial={shouldReduceMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: shouldReduceMotion ? 0 : 0.2, ease: "easeOut" }}
+    <aside
+      id="app-sidebar"
+      aria-label="Main navigation"
+      className={cn(
+        "sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-300 ease-out",
+        expanded ? "w-64" : "w-16",
+      )}
+    >
+      <div className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-3">
+        <button
+          onClick={onToggle}
+          className="relative flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-muted"
+          aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+          aria-expanded={expanded}
+          aria-controls="app-sidebar"
+        >
+          <Menu
+            className={cn(
+              "absolute inset-0 m-auto size-6 transition-all duration-200 ease-out",
+              expanded ? "rotate-90 opacity-0" : "rotate-0 opacity-100",
+            )}
           />
-        )}
-      </AnimatePresence>
-      <aside
+          <X
+            className={cn(
+              "absolute inset-0 m-auto size-6 transition-all duration-200 ease-out",
+              expanded ? "rotate-0 opacity-100" : "-rotate-90 opacity-0",
+            )}
+          />
+        </button>
+        <span
+          className={cn(
+            "overflow-hidden whitespace-nowrap text-lg font-semibold tracking-tight text-foreground transition-opacity duration-200",
+            expanded ? "opacity-100 delay-100" : "opacity-0",
+          )}
+        >
+          KAVACH
+        </span>
+      </div>
+
+      <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden p-3">
+        {visibleNavItems.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            onClick={onCollapse}
+            aria-label={label}
+            title={expanded ? undefined : label}
+            className={({ isActive }) =>
+              cn(
+                "flex w-full items-center overflow-hidden rounded-lg py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 ease-out",
+                expanded ? "justify-start gap-3 px-3" : "justify-center px-0",
+                isActive
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )
+            }
+          >
+            <Icon className="size-6 shrink-0" />
+            {/* `max-w-0` (not just opacity) when collapsed — otherwise the
+                label keeps its full text width even while invisible, which
+                widens the link past the rail and clips the active pill. */}
+            <span
+              className={cn(
+                "overflow-hidden transition-all duration-200",
+                expanded ? "max-w-40 opacity-100 delay-100" : "max-w-0 opacity-0",
+              )}
+            >
+              {label}
+            </span>
+          </NavLink>
+        ))}
+      </nav>
+
+      <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border bg-card transition-transform duration-300 ease-out",
-          "lg:sticky lg:top-0 lg:h-screen lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          "overflow-hidden whitespace-nowrap border-t border-border p-4 text-xs text-muted-foreground transition-opacity duration-200",
+          expanded ? "opacity-100 delay-100" : "opacity-0",
         )}
       >
-        <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-5">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-6 text-primary" />
-            <span className="text-lg font-semibold tracking-tight text-foreground">KAVACH</span>
-          </div>
-          <button
-            onClick={onCloseMobile}
-            className="rounded-md p-1 text-muted-foreground hover:bg-muted lg:hidden"
-            aria-label="Close navigation"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {visibleNavItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onCloseMobile}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ease-out",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )
-              }
-            >
-              <Icon className="size-5 shrink-0" />
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="border-t border-border p-4 text-xs text-muted-foreground">
-          AI-Powered DevSecOps for Banking
-        </div>
-      </aside>
-    </>
+        AI-Powered DevSecOps for Banking
+      </div>
+    </aside>
   );
 }

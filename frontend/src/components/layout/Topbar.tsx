@@ -1,21 +1,13 @@
-import { LogOut, Menu } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "../ui/Button";
 
-export function Topbar({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
+export function Topbar() {
   const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-card/80 px-4 backdrop-blur sm:px-6">
-      <button
-        onClick={onOpenMobileNav}
-        className="rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden"
-        aria-label="Open navigation"
-      >
-        <Menu className="size-5" />
-      </button>
-
       <div className="flex-1" />
 
       <div className="flex items-center gap-3">
