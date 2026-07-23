@@ -77,7 +77,9 @@ export function Modal({ open, onClose, title, children, size = "md" }: ModalProp
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: shouldReduceMotion ? 0 : 0.18, ease: "easeOut" }}
             className={cn(
-              "relative w-full rounded-xl border border-border bg-card text-card-foreground shadow-xl",
+              "relative w-full overflow-hidden rounded-xl border border-border bg-card/70 text-card-foreground",
+              "backdrop-blur-2xl backdrop-saturate-150 shadow-[0_20px_60px_-10px_rgba(0,0,0,0.35)]",
+              "dark:shadow-[0_20px_60px_-8px_rgba(0,0,0,0.6)]",
               sizeClasses[size],
             )}
           >

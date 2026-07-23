@@ -27,7 +27,7 @@ export function SkeletonStatTiles({ count = 4, className }: { count?: number; cl
   return (
     <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4", className)}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-xl border border-border bg-card p-5">
+        <div key={i} className="rounded-xl border border-border bg-card/45 p-5 backdrop-blur-xl backdrop-saturate-150 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]">
           <div className="flex items-start justify-between">
             <Skeleton className="h-3.5 w-24" />
             <Skeleton className="size-5 rounded-full" />
@@ -51,7 +51,7 @@ export function SkeletonTable({
   className?: string;
 }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-5", className)}>
+    <div className={cn("rounded-xl border border-border bg-card/45 p-5 backdrop-blur-xl backdrop-saturate-150 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]", className)}>
       <div className="space-y-4">
         {Array.from({ length: rows }).map((_, r) => (
           <div key={r} className="flex items-center gap-4">
@@ -68,7 +68,7 @@ export function SkeletonTable({
 /** Placeholder shaped like a chart card (`CardHeader` + a rectangular plot area). */
 export function SkeletonChartCard({ height = 240, className }: { height?: number; className?: string }) {
   return (
-    <div className={cn("rounded-xl border border-border bg-card p-5", className)}>
+    <div className={cn("rounded-xl border border-border bg-card/45 p-5 backdrop-blur-xl backdrop-saturate-150 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)]", className)}>
       <Skeleton className="h-4 w-40" />
       <Skeleton className="mt-2 h-3 w-56" />
       <Skeleton className="mt-4 w-full" style={{ height }} />

@@ -50,7 +50,18 @@ export function StatTile({ label, value, icon, delta, className }: StatTileProps
     <Card className={cn("p-5", className)}>
       <div className="flex items-start justify-between">
         <p className="text-sm text-muted-foreground">{label}</p>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
+        {icon && (
+          <div
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-full border border-border/70",
+              "bg-accent/40 text-accent-foreground backdrop-blur-sm",
+              "transition-[box-shadow,color] duration-200 ease-out",
+              "group-hover:text-primary group-hover:shadow-[0_0_14px_-2px_rgba(59,130,246,0.55)]",
+            )}
+          >
+            {icon}
+          </div>
+        )}
       </div>
       <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">
         {numeric ? <AnimatedCounter value={numeric.amount} decimals={numeric.decimals} /> : value}
