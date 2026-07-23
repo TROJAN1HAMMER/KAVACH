@@ -15,9 +15,13 @@ class UserRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: Optional[str] = None
-    # No `role` field, deliberately — self-registration always lands on
-    # the least-privileged default (see AuthService.register). Roles are
-    # assigned afterward by an admin via PATCH /auth/admin/users/{id}/role.
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: Optional[str] = None
+    role: UserRole = UserRole.DEVELOPER
 
 
 class UserRead(BaseModel):

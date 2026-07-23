@@ -16,10 +16,12 @@ from starlette.requests import Request
 from app.auth.permissions import Permission, require_permission
 from app.auth.schemas import (
     ActiveStatusUpdateRequest,
+    AdminUserCreateRequest,
     AuditLogListResponse,
     RoleUpdateRequest,
     UserRead,
 )
+from app.auth.service import AuthService
 from app.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.models.user import User
@@ -32,6 +34,12 @@ router = APIRouter()
 settings = get_settings()
 
 
+def get_auth_service(
+    users: Annotated[UserRepository, Depends(get_user_repository)],
+) -> AuthService:
+    return AuthService(users)
+
+
 @router.get("/auth/admin/users", response_model=list[UserRead])
 async def list_users(
     users: Annotated[UserRepository, Depends(get_user_repository)],
@@ -40,6 +48,33 @@ async def list_users(
     offset: Annotated[int, Query(ge=0)] = 0,
 ):
     return await users.list_all(limit=limit, offset=offset)
+
+
+@router.post("/auth/admin/users", response_model=UserRead, status_code=201)
+async def create_user_as_admin(
+    payload: AdminUserCreateRequest,
+    request: Request,
+    auth_service: Annotated[AuthService, Depends(get_auth_service)],
+    users: Annotated[UserRepository, Depends(get_user_repository)],
+    current_user: Annotated[User, Depends(require_permission(Permission.USER_MANAGE))],
+):
+    user = await auth_service.register(
+        email=payload.email,
+        password=payload.password,
+        full_name=payload.full_name,
+        request=request,
+    )
+    if payload.role != user.role:
+        user = await users.update_role(user.id, payload.role)
+    await log_action(
+        user=current_user,
+        action="user.created_by_admin",
+        resource_type="user",
+        resource_id=str(user.id),
+        request=request,
+        details={"assigned_role": payload.role.value, "email": payload.email},
+    )
+    return user
 
 
 @router.patch("/auth/admin/users/{user_id}/role", response_model=UserRead)

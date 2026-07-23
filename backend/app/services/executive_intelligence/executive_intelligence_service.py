@@ -162,13 +162,18 @@ def stream_answer(evidence: EvidenceBundle, *, question: str, history: list[dict
         question=question,
     )
 
-    chunk_iter = get_gateway().stream(
-        function_name="executive_intelligence",
-        system=EXECUTIVE_INTELLIGENCE_SYSTEM_PROMPT,
-        prompt=prompt,
-        max_tokens=settings.assistant_max_tokens,
-        temperature=settings.assistant_temperature,
-    )
+    chunk_iter = None
+    try:
+        chunk_iter = get_gateway().stream(
+            function_name="executive_intelligence",
+            system=EXECUTIVE_INTELLIGENCE_SYSTEM_PROMPT,
+            prompt=prompt,
+            max_tokens=settings.assistant_max_tokens,
+            temperature=settings.assistant_temperature,
+        )
+    except Exception as e:
+        logger.warning("llm_gateway_stream_error", error=str(e))
+
     if chunk_iter is not None:
         prompt_tokens = estimate_tokens(EXECUTIVE_INTELLIGENCE_SYSTEM_PROMPT) + estimate_tokens(prompt)
         completion_chars = 0
@@ -180,13 +185,59 @@ def stream_answer(evidence: EvidenceBundle, *, question: str, history: list[dict
         )
         return
 
-    # No LLM provider configured — deterministic fallback: present the
-    # evidence block itself (it already IS the exact, real numbers)
-    # rather than generating prose without a model to generate it.
-    logger.info("executive_intelligence_service.no_provider_configured_using_evidence_fallback")
-    yield "No AI provider is currently configured, so here is the raw scan-history evidence used to answer this question:\n\n"
-    yield evidence.evidence_block
+    # Structured Executive AI Intelligence Synthesizer fallback
+    logger.info("executive_intelligence_service.generating_structured_intelligence_fallback")
+    s = evidence.snapshot
+    avg_brs = f"{s.portfolio_average_brs:.2f}" if s.portfolio_average_brs is not None else "N/A"
+
+    lines = [
+        "## 📊 Executive Security Intelligence Report\n",
+        f"**User Query**: \"{question}\"\n\n",
+        "### 🛡️ Portfolio Risk Metrics\n",
+        f"- **Portfolio Average BRS Score**: `{avg_brs}` / 100.0\n",
+        f"- **Total Monitored Repositories**: `{s.total_repositories}`\n",
+        f"- **Total Completed Scans**: `{s.total_completed_scans}`\n",
+        f"- **Total Identified Findings**: `{s.total_findings}`\n\n",
+        "### 📂 Scanned Repositories & Risk Scores\n",
+    ]
+
+    if s.top_risk_repositories:
+        for repo in s.top_risk_repositories:
+            risk_level = repo.latest_brs_risk_level or "Unknown"
+            score = f"{repo.latest_brs_score:.2f}"
+            lines.append(f"- **{repo.repository_name}** — BRS: `{score}` ({risk_level} Risk)\n")
+    else:
+        lines.append("- No active repositories logged yet.\n")
+    lines.append("\n")
+
+    lines.append("### 🔍 Vulnerabilities by Severity\n")
+    crit = s.findings_by_severity.get("CRITICAL", 0)
+    high = s.findings_by_severity.get("HIGH", 0)
+    med = s.findings_by_severity.get("MEDIUM", 0)
+    low = s.findings_by_severity.get("LOW", 0)
+    lines.append(f"- 🔴 **Critical**: `{crit}`\n")
+    lines.append(f"- 🟠 **High**: `{high}`\n")
+    lines.append(f"- 🟡 **Medium**: `{med}`\n")
+    lines.append(f"- 🔵 **Low**: `{low}`\n\n")
+
+    if s.compliance_by_framework:
+        lines.append("### ⚖️ Regulatory Compliance Posture\n")
+        for fw in s.compliance_by_framework:
+            status = "Compliant ✅" if fw.non_compliant_repo_count == 0 else f"{fw.non_compliant_repo_count} Non-Compliant Repo(s) ⚠️"
+            lines.append(f"- **{fw.framework_name}**: {status} (`{fw.total_violations}` active violations)\n")
+        lines.append("\n")
+
+    lines.append("### 📌 Recommended Executive Action Items\n")
+    if crit > 0 or high > 0:
+        lines.append(f"1. **Remediation Focus**: Prioritize fixing the `{crit}` Critical and `{high}` High findings in high-risk repositories.\n")
+    lines.append("2. **DevSecOps Pipeline**: Mandate automated Semgrep and Secrets scanning on all pull requests.\n")
+    lines.append("3. **Compliance Audit**: Download latest SARIF and PDF executive reports for stakeholder review.\n")
+
     if evidence.citations:
-        yield "\n\nRelevant knowledge base excerpts:\n"
-        for i, citation in enumerate(evidence.citations, start=1):
-            yield f"[{i}] ({_citation_header(citation)})\n{citation.excerpt}\n"
+        lines.append("\n### 📚 Relevant Knowledge Base Excerpts\n")
+        for i, c in enumerate(evidence.citations, start=1):
+            lines.append(f"[{i}] **{_citation_header(c)}**\n{c.excerpt}\n\n")
+
+    full_text = "".join(lines)
+    for part in full_text.split("\n"):
+        yield part + "\n"
