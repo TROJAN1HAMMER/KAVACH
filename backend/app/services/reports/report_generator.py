@@ -25,6 +25,7 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Callable, Optional, Union, Dict
 from xml.sax.saxutils import escape as _xml_escape
@@ -34,6 +35,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     HRFlowable, PageBreak,
@@ -92,6 +95,15 @@ def _esc(value) -> str:
 
 
 # ── Charts (reportlab.graphics — no extra dependency beyond reportlab itself) ──
+# `reportlab.graphics` `Drawing`/`Legend` objects do not auto-size to their own content — if a
+# label renders wider than the box declared here, Platypus only ever reserves the *declared*
+# width/height when flowing what comes next, so an under-sized box is a real (if currently
+# unobserved, since today's label text is short/fixed-vocabulary) overlap vector. The pie
+# chart's legend is the one part of either chart whose text length depends on runtime data
+# (a framework's non-compliant count), so its box width is computed from the actual rendered
+# text rather than a fixed guess. Consistent spacing before/after both charts, wherever used.
+CHART_SPACING = 0.4 * cm
+
 
 def _severity_bar_chart(summary: dict) -> Drawing:
     """Findings-by-severity bar chart, one bar per severity, individually colored."""
@@ -128,7 +140,6 @@ def _compliance_pie_chart(compliance_summary: dict) -> Optional[Drawing]:
     compliant = sum(1 for d in compliance_summary.values() if d.get("compliant"))
     non_compliant = len(compliance_summary) - compliant
 
-    drawing = Drawing(320, 160)
     pie = Pie()
     pie.x = 60
     pie.y = 15
@@ -147,19 +158,86 @@ def _compliance_pie_chart(compliance_summary: dict) -> Optional[Drawing]:
         slice_labels = ["Compliant"]
         pie.slices[0].fillColor = colors.HexColor("#16A34A")
 
+    legend_x = 210
+    legend_font = "Helvetica"
+    legend_font_size = 8
+    legend_texts = [f"{label} ({pie.data[i]})" for i, label in enumerate(slice_labels)]
+
     legend = Legend()
-    legend.x = 210
+    legend.x = legend_x
     legend.y = 90
     legend.dx = 8
     legend.dy = 8
-    legend.fontSize = 8
+    legend.fontName = legend_font
+    legend.fontSize = legend_font_size
     legend.colorNamePairs = [
-        (pie.slices[i].fillColor, f"{label} ({pie.data[i]})") for i, label in enumerate(slice_labels)
+        (pie.slices[i].fillColor, text) for i, text in enumerate(legend_texts)
     ]
+
+    # The framework count in each label is the only runtime-variable part of either chart's
+    # text — a two-digit-or-more violation count on "Non-Compliant (NN)" is exactly the kind of
+    # content-dependent width a fixed box guess can't account for. Measure the actual widest
+    # label and only ever grow the drawing to fit it, never shrink below the original 320pt.
+    widest_label = max((stringWidth(t, legend_font, legend_font_size) for t in legend_texts), default=0)
+    drawing_width = max(320, int(legend_x + legend.dx + widest_label + 20))
+    drawing = Drawing(drawing_width, 160)
 
     drawing.add(pie)
     drawing.add(legend)
     return drawing
+
+
+# ── Repeating header/footer (page numbers, scan identity) ─────────────────────
+# Neither PDF used to have any per-page chrome at all — a printed/detached page had no
+# identifying information, and there was no "Page X of Y" anywhere. `SimpleDocTemplate` has no
+# built-in way to know the *total* page count while it's still drawing page N (it doesn't know
+# there'll be a page N+1 yet), so this uses the standard ReportLab two-pass recipe: buffer every
+# page's drawing state via an overridden `showPage()` instead of finalizing it immediately, then
+# in `save()` — once every page has been drawn once and the true total is finally known — replay
+# each buffered page, stamp the footer, and only then hand it to the real `showPage()`/`save()`.
+class NumberedCanvas(Canvas):
+    def __init__(self, *args, scan_id: str = "", repo_name: str = "", generated_at: Optional[datetime] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states: list[dict] = []
+        self._footer_scan_id = scan_id
+        self._footer_repo_name = repo_name
+        self._footer_generated_at = generated_at or datetime.now(timezone.utc)
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total_pages = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            self._draw_footer(total_pages)
+            Canvas.showPage(self)
+        Canvas.save(self)
+
+    def _draw_footer(self, total_pages: int):
+        width, _ = self._pagesize
+        footer_y = 1.1 * cm
+        rule_y = footer_y + 0.32 * cm
+
+        self.saveState()
+        self.setStrokeColor(colors.HexColor("#E2E8F0"))
+        self.setLineWidth(0.5)
+        self.line(2 * cm, rule_y, width - 2 * cm, rule_y)
+
+        self.setFont("Helvetica-Bold", 7.5)
+        self.setFillColor(KAVACH_DARK)
+        self.drawString(2 * cm, footer_y, "KAVACH")
+
+        self.setFont("Helvetica", 7)
+        self.setFillColor(KAVACH_MUTED)
+        timestamp = self._footer_generated_at.strftime("%Y-%m-%d %H:%M UTC")
+        self.drawCentredString(
+            width / 2, footer_y,
+            f"Generated {timestamp}  |  Scan ID: {self._footer_scan_id}",
+        )
+        self.drawRightString(width - 2 * cm, footer_y, f"Page {self._pageNumber} of {total_pages}")
+        self.restoreState()
 
 
 # ── PDF Generation ────────────────────────────────────────────────────────────
@@ -177,6 +255,11 @@ class KavachPDFReport:
             "KavachTitle",
             parent=self.styles["Title"],
             fontSize=28,
+            # The parent "Title" style's own leading (22) is inherited unless overridden —
+            # too tight for a 28pt line (same class of bug fixed on the cover page's inline
+            # styles: leading must scale with fontSize, not just be inherited from a style
+            # that was sized for a smaller font).
+            leading=34,
             textColor=KAVACH_DARK,
             spaceAfter=8,
             fontName="Helvetica-Bold",
@@ -341,7 +424,9 @@ class KavachPDFReport:
         # ── 8. Appendix ──
         story.extend(self._build_appendix(scan_id, repo_name, compliance_summary, generated_at))
 
-        doc.build(story)
+        doc.build(story, canvasmaker=partial(
+            NumberedCanvas, scan_id=scan_id, repo_name=repo_name, generated_at=generated_at,
+        ))
         logger.info("[REPORT] report_generator.pdf.generated", path=str(self.output_path))
         return self.output_path
 
@@ -349,35 +434,40 @@ class KavachPDFReport:
         elements = []
         elements.append(Spacer(1, 1.5 * cm))
 
-        # Logo Header (Hexagon Core / Radar Identity motif)
+        # Logo Header. NOTE: every `ParagraphStyle(...)` below sets an explicit `leading`
+        # (~1.25-1.3x its fontSize) — ReportLab's `ParagraphStyle` defaults `leading` to a
+        # hardcoded 12 when no `parent=` is given, *regardless of fontSize*. Left unset, a
+        # 32pt/20pt/13pt line only reserves a 12pt-tall box for the next flowable to start
+        # from, so the following paragraph's text visually renders on top of this one's
+        # descender — confirmed by rendering this exact page before this fix.
         elements.append(Paragraph(
-            "<font color='#00F0FF'>⬢</font> KAVACH",
-            ParagraphStyle("logo", fontSize=32, fontName="Helvetica-Bold",
+            "KAVACH",
+            ParagraphStyle("logo", fontSize=32, leading=40, fontName="Helvetica-Bold",
                            textColor=KAVACH_DARK, alignment=TA_CENTER)
         ))
         elements.append(Paragraph(
             "BANKING SECURITY COMMAND CENTER",
-            ParagraphStyle("tagline", fontSize=10, fontName="Helvetica-Bold",
+            ParagraphStyle("tagline", fontSize=10, leading=13, fontName="Helvetica-Bold",
                            textColor=KAVACH_MUTED, alignment=TA_CENTER, spaceAfter=20)
         ))
-        
+
         elements.append(HRFlowable(width="100%", thickness=1.5, color=KAVACH_BLUE, spaceAfter=15))
 
         elements.append(Paragraph(
             "CONFIDENTIAL SECURITY AUDIT DOSSIER",
-            ParagraphStyle("cover_header", fontSize=12, fontName="Helvetica-Bold",
+            ParagraphStyle("cover_header", fontSize=12, leading=15, fontName="Helvetica-Bold",
                            textColor=KAVACH_BLUE, alignment=TA_CENTER, spaceAfter=10)
         ))
 
         elements.append(Paragraph(
             f"Vulnerability & Risk Assessment Report",
-            ParagraphStyle("report_title", fontSize=20, fontName="Helvetica-Bold",
+            ParagraphStyle("report_title", fontSize=20, leading=25, fontName="Helvetica-Bold",
                            textColor=KAVACH_DARK, alignment=TA_CENTER, spaceAfter=10)
         ))
 
         elements.append(Paragraph(
-            f"Repository Instance: <b>{repo_name}</b>",
-            ParagraphStyle("repo", fontSize=13, textColor=KAVACH_DARK, alignment=TA_CENTER, spaceAfter=40)
+            f"Repository Instance: <b>{_esc(repo_name)}</b>",
+            ParagraphStyle("repo", fontSize=13, leading=17, textColor=KAVACH_DARK, alignment=TA_CENTER, spaceAfter=40)
         ))
 
         # Overall Risk & BRS Matrix Block
@@ -459,7 +549,7 @@ class KavachPDFReport:
         ))
 
         intro = (
-            f"KAVACH completed a banking security audit of repository <b>{repo_name}</b>. "
+            f"KAVACH completed a banking security audit of repository <b>{_esc(repo_name)}</b>. "
             f"The scanner performed static code parsing (SAST), software composition audit (SCA), "
             f"and deployment configuration assessments. A total of <b>{summary.get('total', 0)} security findings</b> "
             f"were logged during the pipeline run."
@@ -567,7 +657,9 @@ class KavachPDFReport:
         elements.append(Spacer(1, 0.5 * cm))
 
         elements.append(Paragraph("Findings by Severity", self.styles["KavachH2"]))
+        elements.append(Spacer(1, CHART_SPACING))
         elements.append(_severity_bar_chart(summary))
+        elements.append(Spacer(1, CHART_SPACING))
 
         return elements
 
@@ -620,8 +712,9 @@ class KavachPDFReport:
 
         pie = _compliance_pie_chart(compliance_summary)
         if pie is not None:
+            elements.append(Spacer(1, CHART_SPACING))
             elements.append(pie)
-            elements.append(Spacer(1, 0.4 * cm))
+            elements.append(Spacer(1, CHART_SPACING))
 
         # Compliance mappings per finding
         elements.append(Paragraph("MAPPED AUDIT DEVIATIONS", self.styles["KavachH2"]))
@@ -639,11 +732,11 @@ class KavachPDFReport:
                 ))
                 clauses = []
                 if comp.get("rbi_clause"):
-                    clauses.append(f"RBI IT 2021: <u>{comp['rbi_clause']}</u>")
+                    clauses.append(f"RBI IT 2021: <u>{_esc(comp['rbi_clause'])}</u>")
                 if comp.get("pci_clause"):
-                    clauses.append(f"PCI-DSS v4.0: <u>{comp['pci_clause']}</u>")
+                    clauses.append(f"PCI-DSS v4.0: <u>{_esc(comp['pci_clause'])}</u>")
                 if comp.get("swift_clause"):
-                    clauses.append(f"SWIFT CSP: <u>{comp['swift_clause']}</u>")
+                    clauses.append(f"SWIFT CSP: <u>{_esc(comp['swift_clause'])}</u>")
                 
                 elements.append(Paragraph(
                     " &nbsp;&nbsp;&nbsp;&nbsp;MAPPED TO: " + " | ".join(clauses),
@@ -656,15 +749,18 @@ class KavachPDFReport:
         return elements
 
     def _generate_banking_impact(self, f: dict) -> str:
+        """Returns text already safe to interpolate directly into a `Paragraph`-bound
+        f-string — every dynamic value here is escaped at this point, so callers must
+        NOT wrap the return value in `_esc()` again (that would double-escape)."""
         comp = f.get("compliance", {})
         clauses = []
         if comp:
             if comp.get("rbi_clause"):
-                clauses.append(f"RBI Guidelines Section {comp['rbi_clause']}")
+                clauses.append(f"RBI Guidelines Section {_esc(comp['rbi_clause'])}")
             if comp.get("pci_clause"):
-                clauses.append(f"PCI DSS requirement {comp['pci_clause']}")
+                clauses.append(f"PCI DSS requirement {_esc(comp['pci_clause'])}")
             if comp.get("swift_clause"):
-                clauses.append(f"SWIFT CSP clause {comp['swift_clause']}")
+                clauses.append(f"SWIFT CSP clause {_esc(comp['swift_clause'])}")
         
         if clauses:
             ref_clause = " and ".join(clauses)
@@ -689,10 +785,10 @@ class KavachPDFReport:
 
         for idx, f in enumerate(critical_findings, 1):
             sev_color = SEVERITY_COLORS.get(f.get("severity", "").upper(), KAVACH_MUTED)
-            elements.append(Paragraph(
+            title_paragraph = Paragraph(
                 f"Finding #{idx}: <b>{_esc(f.get('title', ''))}</b>",
-                ParagraphStyle("det_title", fontSize=11, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
-            ))
+                ParagraphStyle("det_title", fontSize=11, leading=14, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
+            )
 
             # Metadata Table
             # NOTE: file_path is unbounded scanner-provided data — it must be a
@@ -714,7 +810,14 @@ class KavachPDFReport:
                 ("TOPPADDING", (0, 0), (-1, -1), 2),
                 ("LINEBELOW", (0, -1), (-1, -1), 0.5, colors.lightgrey),
             ]))
-            elements.append(meta_table)
+            # Title + metadata are both small/bounded (a couple of lines, fixed-vocabulary
+            # values) so this KeepTogether can never fail to fit a page — it exists purely to
+            # satisfy "keep the section title with at least one line of its content" without
+            # reintroducing the unbounded-height KeepTogether risk fixed elsewhere in this file.
+            # Description/impact/remediation below are deliberately NOT included — they're
+            # unbounded (scanner/AI text) and already flow safely across a page break on their
+            # own, same as any other Paragraph.
+            elements.append(KeepTogether([title_paragraph, meta_table]))
             elements.append(Spacer(1, 0.15 * cm))
 
             elements.append(Paragraph(
@@ -779,10 +882,10 @@ class KavachPDFReport:
             return elements
 
         for idx, f in enumerate(target_findings, 1):
-            elements.append(Paragraph(
+            title_paragraph = Paragraph(
                 f"Analyst Insight #{idx}: <b>{_esc(f.get('title', ''))}</b>",
-                ParagraphStyle("ai_title", fontSize=10.5, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
-            ))
+                ParagraphStyle("ai_title", fontSize=10.5, leading=13, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=8, spaceAfter=4)
+            )
 
             # Threat Analysis
             threat_analysis = f.get("ai_explanation") or "Automated vulnerability scanner identified potential exposure."
@@ -796,25 +899,55 @@ class KavachPDFReport:
             # Recommended Action
             recommended_action = f.get("ai_remediation") or "Patch code and review system dependency trees."
 
-            # AI Security Analyst Commentary Box
-            ai_data = [
-                [Paragraph("<b>AI Security Analyst Commentary</b>", ParagraphStyle("ai_h", fontSize=8.5, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569")))],
-                [Paragraph(f"<b>Threat Analysis:</b> {_esc(threat_analysis)}", self.styles["KavachSmall"])],
-                [Paragraph(f"<b>Attack Scenario:</b> {attack_scenario}", self.styles["KavachSmall"])],
-                [Paragraph(f"<b>Risk Explanation:</b> {_esc(risk_explanation)}", self.styles["KavachSmall"])],
-                [Paragraph(f"<b>Recommended Action:</b> {_esc(recommended_action)}", self.styles["KavachSmall"])],
-            ]
-            ai_table = Table(ai_data, colWidths=[17 * cm])
-            ai_table.setStyle(TableStyle([
+            # AI Security Analyst Commentary box, styled as a shaded callout. Deliberately NOT
+            # one big Table any more — an AI-generated field (ai_explanation/ai_business_impact/
+            # ai_remediation) can be arbitrarily long, and a Table wrapped in KeepTogether that
+            # doesn't fit even a fresh page silently abandons the "together" request, which used
+            # to strand `title_paragraph` alone on a mostly-blank page while the box jumped to
+            # the next one (reproduced and confirmed via a rendered test PDF). Individual
+            # `Paragraph`s always split gracefully across a page boundary at a line boundary, no
+            # matter how long, so only the small, bounded caption is kept with the title — the
+            # unbounded body fields flow freely and can never orphan/overflow again.
+            box_style = ParagraphStyle(
+                "ai_box_field", parent=self.styles["KavachSmall"],
+                backColor=colors.HexColor("#F8FAFC"), borderColor=colors.HexColor("#CBD5E1"),
+                borderWidth=0.5, borderPadding=(4, 8, 2, 8), spaceAfter=0, leading=11,
+            )
+            caption_table = Table(
+                [[Paragraph("<b>AI Security Analyst Commentary</b>", ParagraphStyle(
+                    "ai_h", fontSize=8.5, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569"),
+                ))]],
+                colWidths=[17 * cm],
+            )
+            caption_table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("LINEABOVE", (0, 0), (-1, 0), 0.5, colors.HexColor("#CBD5E1")),
+                ("LINELEFT", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("LINERIGHT", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
             ]))
-            
-            elements.append(KeepTogether([ai_table, Spacer(1, 0.4 * cm)]))
+            elements.append(KeepTogether([title_paragraph, caption_table]))
+
+            body_fields = [
+                ("Threat Analysis", _esc(threat_analysis)),
+                ("Attack Scenario", attack_scenario),
+                ("Risk Explanation", _esc(risk_explanation)),
+                ("Recommended Action", _esc(recommended_action)),
+            ]
+            for field_idx, (label, value) in enumerate(body_fields):
+                style = box_style
+                if field_idx == len(body_fields) - 1:
+                    # Last field closes the shaded callout — draw the bottom/side border and
+                    # restore normal paragraph spacing after it, instead of a shared Table's
+                    # single outer box (see the docstring above for why this isn't one Table).
+                    style = ParagraphStyle(
+                        "ai_box_field_last", parent=box_style,
+                        borderPadding=(2, 8, 4, 8), spaceAfter=6,
+                    )
+                elements.append(Paragraph(f"<b>{label}:</b> {value}", style))
 
         return elements
 
@@ -876,7 +1009,7 @@ class KavachPDFReport:
             "<b>SBOM Summary:</b> Software Bill of Materials compiled in CycloneDX JSON format "
             f"({scan_id}_sbom.json). It catalogs library trees, versions, and license profiles.<br/><br/>"
             f"<b>Metadata & Engine Version:</b> KAVACH DevSecOps Core v1.0.0. Core scan time: "
-            f"{generated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}. Audit target: repository instance '{repo_name}'.<br/>"
+            f"{generated_at.strftime('%Y-%m-%d %H:%M:%S UTC')}. Audit target: repository instance '{_esc(repo_name)}'.<br/>"
             f"<b>Regulatory Compliance Baseline:</b> {bases_str}",
             self.styles["KavachBody"]
         ))
@@ -1060,15 +1193,16 @@ class KavachTechnicalPDFReport:
         story = []
         story.append(Paragraph("KAVACH Technical Findings Report", self.styles["KavachTitle"]))
         story.append(Paragraph(
-            f"Repository: <b>{repo_name}</b> &nbsp;|&nbsp; Scan ID: {scan_id} &nbsp;|&nbsp; "
+            f"Repository: <b>{_esc(repo_name)}</b> &nbsp;|&nbsp; Scan ID: {_esc(scan_id)} &nbsp;|&nbsp; "
             f"Generated: {generated_at.strftime('%Y-%m-%d %H:%M UTC')}",
             ParagraphStyle("sub", fontSize=9, textColor=KAVACH_MUTED, alignment=TA_CENTER, spaceAfter=16),
         ))
         story.append(HRFlowable(width="100%", thickness=1, color=KAVACH_BLUE, spaceAfter=14))
 
         story.append(Paragraph("Findings Summary", self.styles["KavachH1"]))
+        story.append(Spacer(1, CHART_SPACING))
         story.append(_severity_bar_chart(summary))
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, CHART_SPACING))
         story.append(PageBreak())
 
         story.append(Paragraph("All Findings — Technical Detail", self.styles["KavachH1"]))
@@ -1085,9 +1219,21 @@ class KavachTechnicalPDFReport:
             story.append(Paragraph("No findings were reported for this scan.", self.styles["KavachBody"]))
 
         for idx, f in enumerate(ordered, 1):
-            story.append(KeepTogether(self._build_finding_block(idx, f)))
+            block = self._build_finding_block(idx, f)
+            # Only the title + metadata table (the first two flowables — both small and
+            # bounded: a couple of lines, fixed-vocabulary values) are kept together, so the
+            # heading is never orphaned from at least its metadata. The remainder (description/
+            # compliance/remediation) is unbounded scanner/AI text and is appended unwrapped —
+            # a plain Paragraph already splits gracefully across a page break on its own; wrapping
+            # the *entire* block (as this used to do) meant a long finding whose combined height
+            # exceeded a full page silently abandoned the "keep together" request, which is what
+            # produced the reported layout defects for very long AI explanations/descriptions.
+            story.append(KeepTogether(block[:2]))
+            story.extend(block[2:])
 
-        doc.build(story)
+        doc.build(story, canvasmaker=partial(
+            NumberedCanvas, scan_id=scan_id, repo_name=repo_name, generated_at=generated_at,
+        ))
         logger.info("report_generator.pdf_technical.generated", path=str(self.output_path))
         return self.output_path
 
@@ -1097,7 +1243,7 @@ class KavachTechnicalPDFReport:
         elements = [
             Paragraph(
                 f"#{idx} &nbsp; <font color='{sev_hex}'>[{sev}]</font> <b>{_esc(f.get('title', ''))}</b>",
-                ParagraphStyle("tf_title", fontSize=10.5, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=10, spaceAfter=4),
+                ParagraphStyle("tf_title", fontSize=10.5, leading=13, fontName="Helvetica-Bold", textColor=KAVACH_DARK, spaceBefore=10, spaceAfter=4),
             )
         ]
 
@@ -1132,7 +1278,7 @@ class KavachTechnicalPDFReport:
         compliance = f.get("compliance") or {}
         if compliance:
             clauses = [
-                f"{label}: {compliance[key]}"
+                f"{label}: {_esc(compliance[key])}"
                 for label, key in (("RBI", "rbi_clause"), ("PCI DSS", "pci_clause"), ("SWIFT CSP", "swift_clause"))
                 if compliance.get(key)
             ]
