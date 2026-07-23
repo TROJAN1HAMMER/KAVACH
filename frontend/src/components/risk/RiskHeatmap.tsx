@@ -61,7 +61,7 @@ export function RiskHeatmap({ rows }: { rows: RiskHeatmapRow[] }) {
               return (
                 <div
                   key={severity}
-                  className="group relative"
+                  className="relative"
                   onMouseEnter={() => count > 0 && setHoveredCell(cellKey)}
                   onMouseLeave={() => setHoveredCell(null)}
                   onFocus={() => count > 0 && setHoveredCell(cellKey)}
@@ -82,10 +82,20 @@ export function RiskHeatmap({ rows }: { rows: RiskHeatmapRow[] }) {
                   >
                     {count}
                   </div>
-                  {count > 0 && (
+                  {/* Driven by the same `hoveredCell` state as the scale/glow
+                      effect above (a single value, not independent CSS
+                      `:hover`/`:focus` per cell) so at most one tooltip can
+                      ever be mounted — scrolling the page with the pointer
+                      resting over the grid fires real mouseenter/mouseleave
+                      on each cell it passes under, and CSS-only per-cell
+                      hover state let several fading tooltips render at once.
+                      Positioned BELOW the cell rather than above, since
+                      "above" collides with the severity-label header row for
+                      every cell in the first data row. */}
+                  {count > 0 && isHovered && (
                     <div
                       role="tooltip"
-                      className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-foreground opacity-0 shadow-lg backdrop-blur-md transition-opacity duration-150 group-hover:opacity-100 group-focus:opacity-100"
+                      className="pointer-events-none absolute left-1/2 top-full z-20 mt-2 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card/95 px-2 py-1 text-xs text-foreground shadow-lg backdrop-blur-md"
                     >
                       {row.repositoryName} — {severityStyle(severity).label}: <span className="font-semibold">{count}</span>
                     </div>
