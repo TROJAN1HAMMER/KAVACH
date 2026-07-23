@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Bot, Download, Send, Sparkles, User as UserIcon, XCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Bot, Download, Info, Send, Sparkles, User as UserIcon, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader } from "../ui/Card";
-import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { EmptyState } from "../ui/EmptyState";
 import { CitationList } from "../knowledge/CitationItem";
+import { ExecutiveMarkdown } from "./ExecutiveMarkdown";
+import { ConfidenceBadge } from "./ConfidenceBadge";
+import { EvidenceHighlights } from "./EvidenceHighlights";
 import { useExecutiveIntelligence, type ExecutiveIntelligenceMessage } from "../../hooks/useExecutiveIntelligence";
 import { executiveIntelligenceApi } from "../../lib/api/executiveIntelligence";
 import { useToast } from "../../hooks/useToast";
-import { formatScore } from "../../lib/utils";
+import { splitStreamedSections } from "../../lib/markdownSections";
 import { cn } from "../../lib/utils";
 
 const SUGGESTED_QUESTIONS = [
@@ -18,95 +21,14 @@ const SUGGESTED_QUESTIONS = [
   "What should leadership prioritize?",
 ];
 
-function EvidenceSummary({ message }: { message: ExecutiveIntelligenceMessage }) {
-  const evidence = message.evidence;
-  if (!evidence) return null;
-
-  if (evidence.total_completed_scans === 0) {
-    return <p className="text-xs text-muted-foreground">No completed scans exist yet.</p>;
-  }
-
-  const severityEntries = Object.entries(evidence.findings_by_severity).sort(
-    (a, b) => b[1] - a[1],
-  );
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Evidence used ({evidence.total_completed_scans} scans across {evidence.total_repositories} repositories)
-      </p>
-
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div>
-          <p className="text-xs text-muted-foreground">Portfolio avg BRS</p>
-          <p className="text-lg font-semibold tabular-nums">{formatScore(evidence.portfolio_average_brs)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Total findings</p>
-          <p className="text-lg font-semibold tabular-nums">{evidence.total_findings}</p>
-        </div>
-        {evidence.week_over_week && (
-          <>
-            <div>
-              <p className="text-xs text-muted-foreground">Scans this week</p>
-              <p className="text-lg font-semibold tabular-nums">{evidence.week_over_week.scans_this_week}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">vs. last week</p>
-              <p className="text-lg font-semibold tabular-nums">{evidence.week_over_week.scans_last_week}</p>
-            </div>
-          </>
-        )}
-      </div>
-
-      {severityEntries.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {severityEntries.map(([severity, count]) => (
-            <Badge key={severity} tone="neutral">
-              {severity}: {count}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {evidence.top_risk_repositories.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Top risk repositories</p>
-          <div className="flex flex-wrap gap-1.5">
-            {evidence.top_risk_repositories.map((repo) => (
-              <Badge key={repo.repository_id} tone={repo.latest_brs_score >= 70 ? "danger" : "warning"}>
-                {repo.repository_name}: {repo.latest_brs_score.toFixed(0)}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {evidence.compliance_by_framework.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">Compliance</p>
-          <div className="flex flex-wrap gap-1.5">
-            {evidence.compliance_by_framework.map((fw) => {
-              const total = fw.compliant_repo_count + fw.non_compliant_repo_count;
-              return (
-                <Badge key={fw.framework_key} tone={fw.non_compliant_repo_count > 0 ? "warning" : "success"}>
-                  {fw.framework_name}: {fw.compliant_repo_count}/{total} compliant
-                </Badge>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function MessageBubble({
   message,
   question,
+  onSuggested,
 }: {
   message: ExecutiveIntelligenceMessage;
   question: string | undefined;
+  onSuggested: (question: string) => void;
 }) {
   const isUser = message.role === "user";
   const toast = useToast();
@@ -114,6 +36,7 @@ function MessageBubble({
 
   const canExport =
     !isUser && !message.isStreaming && !message.error && !message.isInsufficientContext && message.evidence;
+  const showEvidence = !isUser && !message.isInsufficientContext && !message.error;
 
   const handleExport = async () => {
     if (!message.evidence || !question) return;
@@ -134,6 +57,9 @@ function MessageBubble({
     }
   };
 
+  const streamedSections = !isUser && message.isStreaming ? splitStreamedSections(message.content) : null;
+  const relatedQuestions = SUGGESTED_QUESTIONS.filter((suggestion) => suggestion !== question);
+
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
       <div
@@ -144,29 +70,78 @@ function MessageBubble({
       >
         {isUser ? <UserIcon className="size-4" /> : <Bot className="size-4" />}
       </div>
-      <div className={cn("max-w-[85%] space-y-2", isUser && "flex flex-col items-end")}>
-        <div
-          className={cn(
-            "rounded-xl px-4 py-2.5 text-sm",
-            isUser ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground",
-            message.error && "border-danger/40 bg-danger/10 text-danger",
-          )}
-        >
-          <p className="whitespace-pre-wrap">{message.error ? message.error : message.content}</p>
-          {message.isStreaming && !message.content && (
-            <span className="inline-flex gap-1 py-1">
-              <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
-              <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:0.15s]" />
-              <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:0.3s]" />
-            </span>
-          )}
-        </div>
 
-        {!isUser && <EvidenceSummary message={message} />}
+      <div className={cn("w-full min-w-0 space-y-2 sm:max-w-[85%] lg:max-w-3xl", isUser && "flex flex-col items-end")}>
+        {isUser ? (
+          <div className="rounded-xl bg-primary px-4 py-2.5 text-sm text-primary-foreground">
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          </div>
+        ) : message.error ? (
+          <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-2.5 text-sm text-danger">
+            <p className="whitespace-pre-wrap">{message.error}</p>
+          </div>
+        ) : message.isInsufficientContext ? (
+          <div className="w-full rounded-xl border border-dashed border-border bg-muted/40 px-4 py-3">
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Info className="mt-0.5 size-4 shrink-0" />
+              <p>{message.content}</p>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {relatedQuestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => onSuggested(suggestion)}
+                  className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="w-full min-w-0 rounded-xl border border-border bg-card px-4 py-3">
+            {message.isStreaming && !message.content ? (
+              <span className="inline-flex gap-1 py-1">
+                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground" />
+                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:0.15s]" />
+                <span className="size-1.5 animate-pulse rounded-full bg-muted-foreground [animation-delay:0.3s]" />
+              </span>
+            ) : streamedSections ? (
+              <>
+                {streamedSections.complete.map((section, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, ease: "easeOut" }}
+                  >
+                    <ExecutiveMarkdown>{section}</ExecutiveMarkdown>
+                  </motion.div>
+                ))}
+                {streamedSections.trailing && (
+                  <p className="whitespace-pre-wrap text-sm text-foreground">
+                    {streamedSections.trailing}
+                    <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse-slow bg-muted-foreground align-middle" />
+                  </p>
+                )}
+              </>
+            ) : (
+              <ExecutiveMarkdown>{message.content}</ExecutiveMarkdown>
+            )}
+          </div>
+        )}
+
+        {showEvidence && message.evidence && (
+          <div className="w-full space-y-2">
+            <EvidenceHighlights evidence={message.evidence} />
+            {!message.isStreaming && <ConfidenceBadge confidence={message.kbConfidence ?? null} />}
+          </div>
+        )}
 
         {!isUser && message.citations && message.citations.length > 0 && (
           <div className="w-full">
-            <CitationList citations={message.citations} title="Supplementary sources" />
+            <CitationList citations={message.citations} title="Supporting Evidence" />
           </div>
         )}
 
@@ -241,7 +216,12 @@ export function ExecutiveIntelligencePanel() {
           messages.map((message, index) => {
             const precedingUserMessage = message.role === "assistant" ? messages[index - 1] : undefined;
             return (
-              <MessageBubble key={message.id} message={message} question={precedingUserMessage?.content} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                question={precedingUserMessage?.content}
+                onSuggested={handleSuggested}
+              />
             );
           })
         )}

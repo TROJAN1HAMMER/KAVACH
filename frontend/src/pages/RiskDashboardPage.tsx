@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Radar, ShieldAlert, TrendingUp, Zap } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { AlertTriangle, ShieldAlert, Zap } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { StatTile } from "../components/ui/StatTile";
 import { Card, CardContent, CardHeader } from "../components/ui/Card";
@@ -12,11 +11,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { BrsTrendChart } from "../components/charts/BrsTrendChart";
 import { SeverityDistributionChart } from "../components/charts/SeverityDistributionChart";
+import { RepositoryComparisonChart } from "../components/charts/RepositoryComparisonChart";
+import { ScannerContributionChart } from "../components/charts/ScannerContributionChart";
+import { FindingTrendsChart, type FindingTrendPoint } from "../components/charts/FindingTrendsChart";
+import { RiskDistributionChart } from "../components/charts/RiskDistributionChart";
+import { RadialGauge } from "../components/charts/RadialGauge";
 import { RiskHeatmap, type RiskHeatmapRow } from "../components/risk/RiskHeatmap";
 import { useScanJobs } from "../hooks/useScanJobs";
-import { useTheme } from "../hooks/useTheme";
-import { useChartEntryAnimation } from "../hooks/useChartEntryAnimation";
-import { extractSeverityCounts, extractSourceCounts, CATEGORICAL_PALETTE } from "../lib/severity";
+import { useChartTheme } from "../hooks/useChartTheme";
+import { extractSeverityCounts, extractSourceCounts } from "../lib/severity";
 import { formatDateTime, formatScore } from "../lib/utils";
 import type { Severity } from "../types/api";
 
@@ -36,7 +39,7 @@ function riskTone(riskLevel: string | null): "neutral" | "success" | "warning" |
 
 export default function RiskDashboardPage() {
   const navigate = useNavigate();
-  const { theme } = useTheme();
+  const chartTheme = useChartTheme();
   const { data, isLoading } = useScanJobs({ status: "completed", limit: 100 });
 
   const completedJobs = useMemo(
@@ -110,6 +113,34 @@ export default function RiskDashboardPage() {
     return [...byRepo.values()].sort((a, b) => b.score - a.score).slice(0, 8);
   }, [completedJobs]);
 
+  const findingTrendPoints = useMemo<FindingTrendPoint[]>(
+    () =>
+      [...completedJobs]
+        .filter((j) => j.finished_at)
+        .sort((a, b) => (a.finished_at ?? "").localeCompare(b.finished_at ?? ""))
+        .slice(-30)
+        .map((j) => ({
+          finishedAt: j.finished_at as string,
+          repositoryName: j.repository_name,
+          counts: extractSeverityCounts(j.summary),
+        })),
+    [completedJobs],
+  );
+
+  // Latest BRS score per repository (first occurrence while walking
+  // newest-first `completedJobs`) — a repo scanned several times contributes
+  // one point to the distribution, not one per scan.
+  const latestBrsPerRepo = useMemo(() => {
+    const seen = new Set<string>();
+    const scores: number[] = [];
+    for (const job of completedJobs) {
+      if (seen.has(job.repository_id) || job.brs_score === null) continue;
+      seen.add(job.repository_id);
+      scores.push(job.brs_score);
+    }
+    return scores;
+  }, [completedJobs]);
+
   // Repository x severity grid — latest scan per repository (`completedJobs`
   // is already sorted newest-first, so the first occurrence of a
   // `repository_id` while walking it *is* that repo's latest scan), ranked
@@ -130,11 +161,6 @@ export default function RiskDashboardPage() {
       .sort((a, b) => (b.counts.CRITICAL ?? 0) - (a.counts.CRITICAL ?? 0) || (b.counts.HIGH ?? 0) - (a.counts.HIGH ?? 0))
       .slice(0, 8);
   }, [completedJobs]);
-
-  const gridColor = theme === "dark" ? "#2c2c2a" : "#e1e0d9";
-  const axisColor = theme === "dark" ? "#c3c2b7" : "#52514e";
-  const blueHex = theme === "dark" ? "#3987e5" : "#2a78d6";
-  const chartAnimationActive = useChartEntryAnimation(700);
 
   if (isLoading) {
     return (
@@ -170,10 +196,24 @@ export default function RiskDashboardPage() {
         description="Deep analytical view of the portfolio's risk posture — trends, severity, exposure, and scanner contribution."
       />
 
-      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <RevealItem>
-          <StatTile label="Average BRS" value={formatScore(stats?.avg)} icon={<TrendingUp className="size-5" />} />
+          <Card className="h-full">
+            <CardContent className="flex items-center justify-center py-2">
+              <RadialGauge label="Average BRS" value={stats?.avg ?? null} mode={chartTheme.mode} />
+            </CardContent>
+          </Card>
         </RevealItem>
+        <RevealItem>
+          <Card className="h-full">
+            <CardContent className="flex items-center justify-center py-2">
+              <RadialGauge label="Avg. Attack Surface Exposure" value={portfolioBreakdown.avgAse} mode={chartTheme.mode} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
+
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <RevealItem>
           <StatTile
             label="High / critical repos"
@@ -183,13 +223,6 @@ export default function RiskDashboardPage() {
         </RevealItem>
         <RevealItem>
           <StatTile label="Total findings" value={stats?.totalFindings ?? 0} icon={<Zap className="size-5" />} />
-        </RevealItem>
-        <RevealItem>
-          <StatTile
-            label="Avg. Attack Surface Exposure"
-            value={formatScore(portfolioBreakdown.avgAse)}
-            icon={<Radar className="size-5" />}
-          />
         </RevealItem>
         <RevealItem>
           <StatTile
@@ -214,36 +247,7 @@ export default function RiskDashboardPage() {
           <Card className="h-full">
             <CardHeader title="Repository comparison" description="Highest Banking Risk Score per repository." />
             <CardContent>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={topRepos} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
-                  <CartesianGrid horizontal={false} stroke={gridColor} />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={false} width={110} />
-                  <Tooltip
-                    cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(11,11,11,0.03)" }}
-                    contentStyle={{
-                      background: theme === "dark" ? "#1a1a19" : "#fcfcfb",
-                      border: `1px solid ${gridColor}`,
-                      borderRadius: 8,
-                      fontSize: 12,
-                      color: theme === "dark" ? "#ffffff" : "#0b0b0b",
-                    }}
-                    formatter={(value) => [Number(value).toFixed(1), "BRS score"]}
-                  />
-                  <Bar
-                    dataKey="score"
-                    radius={[0, 4, 4, 0]}
-                    maxBarSize={20}
-                    isAnimationActive={chartAnimationActive}
-                    animationDuration={700}
-                    animationEasing="ease-out"
-                  >
-                    {topRepos.map((repo) => (
-                      <Cell key={repo.name} fill={blueHex} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <RepositoryComparisonChart repositories={topRepos} />
             </CardContent>
           </Card>
         </RevealItem>
@@ -263,29 +267,27 @@ export default function RiskDashboardPage() {
           <Card className="h-full">
             <CardHeader title="Scanner contribution" description="Findings logged per scanner engine, portfolio-wide." />
             <CardContent>
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={portfolioBreakdown.sourceContribution} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barCategoryGap="30%">
-                  <CartesianGrid vertical={false} stroke={gridColor} />
-                  <XAxis dataKey="source" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} />
-                  <YAxis allowDecimals={false} tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={false} width={40} />
-                  <Tooltip
-                    cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(11,11,11,0.03)" }}
-                    contentStyle={{
-                      background: theme === "dark" ? "#1a1a19" : "#fcfcfb",
-                      border: `1px solid ${gridColor}`,
-                      borderRadius: 8,
-                      fontSize: 12,
-                      color: theme === "dark" ? "#ffffff" : "#0b0b0b",
-                    }}
-                    formatter={(value) => [Number(value), "Findings"]}
-                  />
-                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={chartAnimationActive} animationDuration={700} animationEasing="ease-out">
-                    {portfolioBreakdown.sourceContribution.map((entry, index) => (
-                      <Cell key={entry.source} fill={CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length][theme]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <ScannerContributionChart contributions={portfolioBreakdown.sourceContribution} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
+
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Finding trends" description="Severity mix across the most recent 30 completed scans." />
+            <CardContent>
+              <FindingTrendsChart points={findingTrendPoints} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Risk distribution" description="Repositories grouped by their latest Banking Risk Score." />
+            <CardContent>
+              <RiskDistributionChart scores={latestBrsPerRepo} />
             </CardContent>
           </Card>
         </RevealItem>

@@ -11,8 +11,10 @@ import { Button } from "../ui/Button";
 import { ProgressBar } from "../ui/ProgressBar";
 import { Spinner } from "../ui/Spinner";
 import { SeverityDistributionChart } from "../charts/SeverityDistributionChart";
+import { RadialGauge } from "../charts/RadialGauge";
+import { useChartTheme } from "../../hooks/useChartTheme";
 import { extractSeverityCounts } from "../../lib/severity";
-import { cn, formatDateTime, formatScore } from "../../lib/utils";
+import { cn, formatDateTime } from "../../lib/utils";
 import { reportsApi } from "../../lib/api/reports";
 import type { ReportType } from "../../types/api";
 
@@ -46,6 +48,7 @@ const AVAILABLE_REPORT_TYPES: ReportType[] = [
 
 export function ScanDetailPanel({ scanJobId }: { scanJobId: string }) {
   const navigate = useNavigate();
+  const chartTheme = useChartTheme();
   const { data: job, isLoading } = useScanJob(scanJobId);
   const cancelScan = useCancelScanJob();
   const { data: reportStatus } = useReportStatus(job?.status === "completed" ? scanJobId : undefined);
@@ -159,17 +162,16 @@ export function ScanDetailPanel({ scanJobId }: { scanJobId: string }) {
 
       {job.status === "completed" && (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-xs text-muted-foreground">Banking Risk Score</p>
-              <p className="mt-1 text-2xl font-semibold">{formatScore(job.brs_score)}</p>
-              <p className="text-xs text-muted-foreground">{job.brs_risk_level ?? "—"}</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex items-center justify-center rounded-lg border border-border py-3">
+              <RadialGauge label="Banking Risk Score" value={job.brs_score} mode={chartTheme.mode} size={148} />
             </div>
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-xs text-muted-foreground">Attack Surface Exposure</p>
-              <p className="mt-1 text-2xl font-semibold">{formatScore(job.attack_surface_exposure_score)}</p>
-              <p className="text-xs text-muted-foreground">{job.attack_surface_exposure_level ?? "—"}</p>
+            <div className="flex items-center justify-center rounded-lg border border-border py-3">
+              <RadialGauge label="Attack Surface Exposure" value={job.attack_surface_exposure_score} mode={chartTheme.mode} size={148} />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="rounded-lg border border-border p-3">
               <p className="text-xs text-muted-foreground">Total findings</p>
               <p className="mt-1 text-2xl font-semibold">{job.total_findings ?? 0}</p>

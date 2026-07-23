@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } fro
 import { SeverityBadge } from "../components/ui/Badge";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { ComplianceBarChart } from "../components/charts/ComplianceBarChart";
+import { StatusTimeline, type TimelineStep } from "../components/charts/StatusTimeline";
 import { useScanJobs } from "../hooks/useScanJobs";
 import { useCompliance, useReportStatus } from "../hooks/useFindings";
 import { usePermissions } from "../hooks/usePermissions";
@@ -74,7 +75,18 @@ export default function ComplianceDashboardPage() {
   }, [completedJobs, searchParams, setSearchParams]);
 
   const { data: compliance, isLoading: loadingCompliance } = useCompliance(selectedScanId || undefined);
+  const { data: reportStatus } = useReportStatus(selectedScanId || undefined);
   const selectedJob = completedJobs.find((job) => job.scan_job_id === selectedScanId);
+
+  // Reframed honestly as the *current* evaluation's real stages rather than
+  // a fabricated multi-scan historical trend (which would need N sequential
+  // `useCompliance` calls, one per past scan — the same inefficient pattern
+  // deliberately avoided elsewhere in this dashboard).
+  const evaluationSteps: TimelineStep[] = [
+    { key: "scan", label: "Scan completed", status: selectedJob?.finished_at ? "complete" : "pending" },
+    { key: "compliance", label: "Compliance evaluated", status: compliance ? "complete" : "current" },
+    { key: "report", label: "Report available", status: reportStatus?.compliance_report_available ? "complete" : "current" },
+  ];
 
   if (loadingScans) return <FullPageSpinner />;
 
@@ -126,6 +138,17 @@ export default function ComplianceDashboardPage() {
         </div>
       ) : (
         <>
+          <RevealSection className="mb-6">
+            <RevealItem>
+              <Card>
+                <CardHeader title="Compliance evaluation" description="Current status for this scan." />
+                <CardContent>
+                  <StatusTimeline steps={evaluationSteps} />
+                </CardContent>
+              </Card>
+            </RevealItem>
+          </RevealSection>
+
           <RevealSection className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <RevealItem className="lg:col-span-1">
               <Card className="h-full">

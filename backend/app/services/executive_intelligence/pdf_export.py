@@ -14,6 +14,7 @@ sharing real logic.
 """
 
 import io
+import re
 from datetime import datetime, timezone
 from typing import Optional
 from xml.sax.saxutils import escape as xml_escape
@@ -23,6 +24,119 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
+_CODE_RE = re.compile(r"`(.+?)`")
+_TABLE_SEPARATOR_RE = re.compile(r"^:?-{2,}:?$")
+_HEADING_RE = re.compile(r"^(#{1,2})\s+(.*)")
+_BULLET_RE = re.compile(r"^[-•]\s+(.*)")
+_NUMBERED_RE = re.compile(r"^(\d+)\.\s+(.*)")
+
+
+def _inline_markdown(text: str) -> str:
+    """`**bold**` -> `<b>bold</b>` and `` `code` `` -> a monospace `<font>`
+    run (ReportLab's own Paragraph mini-markup, already used elsewhere in
+    this codebase) — applied AFTER escaping so the `*`/backtick markers
+    themselves are never mistaken for markup."""
+    escaped = xml_escape(text)
+    escaped = _CODE_RE.sub(r'<font face="Courier">\1</font>', escaped)
+    return _BOLD_RE.sub(r"<b>\1</b>", escaped)
+
+
+def _table_row_cells(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _render_markdown_answer(answer: str, styles) -> list:
+    """Lightweight markdown -> ReportLab pass for the LLM's structured
+    answer text (headings, bullets/numbered lists, bold, pipe tables) so
+    the PDF typesets it properly instead of showing raw `#`/`**`/`|`
+    characters. Purely a typesetting concern over the same `answer` string
+    the API already returns — computes nothing new."""
+    heading1_style = ParagraphStyle("AnswerH1", parent=styles["Heading3"], spaceBefore=6, spaceAfter=4)
+    heading2_style = ParagraphStyle("AnswerH2", parent=styles["Heading4"], spaceBefore=4, spaceAfter=2)
+    bullet_style = ParagraphStyle("AnswerBullet", parent=styles["Normal"], leftIndent=14)
+    cell_style = ParagraphStyle("AnswerTableCell", parent=styles["Normal"], fontSize=9)
+    header_cell_style = ParagraphStyle("AnswerTableHeader", parent=cell_style, fontName="Helvetica-Bold")
+
+    flowables: list = []
+    lines = answer.splitlines()
+    index = 0
+    while index < len(lines):
+        stripped = lines[index].strip()
+
+        if not stripped:
+            index += 1
+            continue
+
+        if stripped.startswith("|") and stripped.endswith("|"):
+            table_lines = []
+            while index < len(lines) and lines[index].strip().startswith("|") and lines[index].strip().endswith("|"):
+                table_lines.append(lines[index].strip())
+                index += 1
+            rows = [
+                cells
+                for row in table_lines
+                for cells in [_table_row_cells(row)]
+                if not all(_TABLE_SEPARATOR_RE.match(cell) for cell in cells)
+            ]
+            if rows:
+                col_count = max(len(row) for row in rows)
+                normalized_rows = [row + [""] * (col_count - len(row)) for row in rows]
+                table_data = [
+                    [
+                        Paragraph(_inline_markdown(cell), header_cell_style if row_index == 0 else cell_style)
+                        for cell in row
+                    ]
+                    for row_index, row in enumerate(normalized_rows)
+                ]
+                col_width = (17 * cm) / col_count
+                table = Table(table_data, colWidths=[col_width] * col_count)
+                table.setStyle(
+                    TableStyle(
+                        [
+                            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1f2937")),
+                            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#d1d5db")),
+                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9fafb")]),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                            ("TOPPADDING", (0, 0), (-1, -1), 4),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                        ]
+                    )
+                )
+                flowables.append(table)
+                flowables.append(Spacer(1, 0.2 * cm))
+            continue
+
+        heading_match = _HEADING_RE.match(stripped)
+        if heading_match:
+            level, text = heading_match.groups()
+            style = heading1_style if len(level) == 1 else heading2_style
+            flowables.append(Paragraph(_inline_markdown(text), style))
+            index += 1
+            continue
+
+        bullet_match = _BULLET_RE.match(stripped)
+        if bullet_match:
+            flowables.append(Paragraph(f"•&nbsp;&nbsp;{_inline_markdown(bullet_match.group(1))}", bullet_style))
+            index += 1
+            continue
+
+        numbered_match = _NUMBERED_RE.match(stripped)
+        if numbered_match:
+            number, text = numbered_match.groups()
+            flowables.append(Paragraph(f"{number}.&nbsp;&nbsp;{_inline_markdown(text)}", bullet_style))
+            index += 1
+            continue
+
+        flowables.append(Paragraph(_inline_markdown(stripped), styles["Normal"]))
+        flowables.append(Spacer(1, 0.15 * cm))
+        index += 1
+
+    return flowables
 
 
 def _metric_rows(evidence: dict) -> list[list[str]]:
@@ -90,11 +204,7 @@ def render_pdf(
         Paragraph("Answer", styles["Heading2"]),
     ]
 
-    for paragraph in answer.split("\n\n"):
-        cleaned = paragraph.strip()
-        if cleaned:
-            story.append(Paragraph(xml_escape(cleaned).replace("\n", "<br/>"), styles["Normal"]))
-            story.append(Spacer(1, 0.2 * cm))
+    story.extend(_render_markdown_answer(answer, styles))
 
     if confidence is not None:
         story.append(

@@ -1,6 +1,9 @@
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useTheme } from "../../hooks/useTheme";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useChartTheme } from "../../hooks/useChartTheme";
 import { useChartEntryAnimation } from "../../hooks/useChartEntryAnimation";
+import { ChartGradientDefs } from "./ChartGradientDefs";
+import { useChartGradientIds } from "../../hooks/useChartGradientIds";
+import { ChartTooltip, ChartTooltipRow, ChartTooltipDelta } from "./ChartTooltip";
 import { formatDateTime } from "../../lib/utils";
 
 export interface BrsTrendPoint {
@@ -9,53 +12,55 @@ export interface BrsTrendPoint {
   repositoryName: string;
 }
 
-export function BrsTrendChart({ points, height = 280 }: { points: BrsTrendPoint[]; height?: number }) {
-  const { theme } = useTheme();
-  const isAnimationActive = useChartEntryAnimation(700);
-  const gridColor = theme === "dark" ? "#2c2c2a" : "#e1e0d9";
-  const axisColor = theme === "dark" ? "#c3c2b7" : "#52514e";
-  const lineColor = theme === "dark" ? "#3987e5" : "#2a78d6";
+interface TrendDatum extends BrsTrendPoint {
+  label: string;
+  delta: number;
+}
 
-  const data = points.map((p) => ({
+export function BrsTrendChart({ points, height = 280 }: { points: BrsTrendPoint[]; height?: number }) {
+  const chartTheme = useChartTheme();
+  const isAnimationActive = useChartEntryAnimation(700);
+  const ids = useChartGradientIds();
+
+  const data: TrendDatum[] = points.map((p, index) => ({
     ...p,
     label: new Date(p.finishedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    delta: index > 0 ? p.brsScore - points[index - 1].brsScore : 0,
   }));
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke={gridColor} />
-        <XAxis dataKey="label" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} />
-        <YAxis
-          domain={[0, 100]}
-          tick={{ fill: axisColor, fontSize: 12 }}
-          tickLine={false}
-          axisLine={false}
-          width={40}
-        />
+      <AreaChart data={data} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+        <ChartGradientDefs ids={ids} mode={chartTheme.mode} />
+        <CartesianGrid vertical={false} stroke={chartTheme.gridColor} />
+        <XAxis dataKey="label" tick={{ fill: chartTheme.axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: chartTheme.gridColor }} />
+        <YAxis domain={[0, 100]} tick={{ fill: chartTheme.axisColor, fontSize: 12 }} tickLine={false} axisLine={false} width={40} />
         <Tooltip
-          contentStyle={{
-            background: theme === "dark" ? "#1a1a19" : "#fcfcfb",
-            border: `1px solid ${gridColor}`,
-            borderRadius: 8,
-            fontSize: 12,
-            color: theme === "dark" ? "#ffffff" : "#0b0b0b",
+          cursor={{ stroke: chartTheme.gridColor, strokeWidth: 1 }}
+          content={({ active, payload }) => {
+            const point = payload?.[0]?.payload as TrendDatum | undefined;
+            if (!point) return null;
+            return (
+              <ChartTooltip active={active} title={formatDateTime(point.finishedAt)}>
+                <ChartTooltipRow colorHex={chartTheme.blue} label={point.repositoryName} value={point.brsScore.toFixed(1)} />
+                <ChartTooltipDelta delta={point.delta} invert />
+              </ChartTooltip>
+            );
           }}
-          labelFormatter={(_, payload) => (payload?.[0] ? formatDateTime(payload[0].payload.finishedAt) : "")}
-          formatter={(value, _name, payload) => [Number(value).toFixed(1), payload.payload.repositoryName]}
         />
-        <Line
+        <Area
           type="monotone"
           dataKey="brsScore"
-          stroke={lineColor}
+          stroke={chartTheme.blue}
           strokeWidth={2}
-          dot={{ r: 4, fill: lineColor, strokeWidth: 2, stroke: theme === "dark" ? "#1a1a19" : "#fcfcfb" }}
-          activeDot={{ r: 5 }}
+          fill={`url(#${ids.blue})`}
+          dot={false}
+          activeDot={{ r: 5, fill: chartTheme.blue, strokeWidth: 2, stroke: chartTheme.surface }}
           isAnimationActive={isAnimationActive}
           animationDuration={700}
           animationEasing="ease-out"
         />
-      </LineChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }

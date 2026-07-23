@@ -2,18 +2,20 @@ import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useChartTheme } from "../../hooks/useChartTheme";
 import { useChartEntryAnimation } from "../../hooks/useChartEntryAnimation";
-import { CATEGORICAL_PALETTE } from "../../lib/severity";
 import { ChartGradientDefs } from "./ChartGradientDefs";
 import { useChartGradientIds } from "../../hooks/useChartGradientIds";
 import { ChartTooltip, ChartTooltipRow } from "./ChartTooltip";
 
-export interface ComplianceBarPoint {
-  shortCode: string;
-  frameworkName: string;
-  compliancePercentage: number;
+export interface RepositoryScorePoint {
+  name: string;
+  score: number;
 }
 
-export function ComplianceBarChart({ points, height = 240 }: { points: ComplianceBarPoint[]; height?: number }) {
+/** Highest Banking Risk Score per repository — extracted out of
+ *  `RiskDashboardPage.tsx`'s previously inline `BarChart` so it shares the
+ *  same gradient/hover/tooltip treatment as every other chart instead of
+ *  duplicating the boilerplate a third time. */
+export function RepositoryComparisonChart({ repositories, height = 280 }: { repositories: RepositoryScorePoint[]; height?: number }) {
   const chartTheme = useChartTheme();
   const isAnimationActive = useChartEntryAnimation(700);
   const ids = useChartGradientIds();
@@ -21,59 +23,46 @@ export function ComplianceBarChart({ points, height = 240 }: { points: Complianc
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={points} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
+      <BarChart data={repositories} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
         <ChartGradientDefs ids={ids} mode={chartTheme.mode} />
         <CartesianGrid horizontal={false} stroke={chartTheme.gridColor} />
-        <XAxis
-          type="number"
-          domain={[0, 100]}
-          tick={{ fill: chartTheme.axisColor, fontSize: 12 }}
-          tickLine={false}
-          axisLine={{ stroke: chartTheme.gridColor }}
-          unit="%"
-        />
-        <YAxis
-          type="category"
-          dataKey="shortCode"
-          tick={{ fill: chartTheme.axisColor, fontSize: 12 }}
-          tickLine={false}
-          axisLine={false}
-          width={72}
-        />
+        <XAxis type="number" domain={[0, 100]} tick={{ fill: chartTheme.axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: chartTheme.gridColor }} />
+        <YAxis type="category" dataKey="name" tick={{ fill: chartTheme.axisColor, fontSize: 12 }} tickLine={false} axisLine={false} width={110} />
         <Tooltip
           cursor={{ fill: chartTheme.cursorFill }}
           content={({ active, payload }) => {
-            const point = payload?.[0]?.payload as ComplianceBarPoint | undefined;
+            const point = payload?.[0]?.payload as RepositoryScorePoint | undefined;
             if (!point) return null;
             return (
-              <ChartTooltip active={active} title={point.frameworkName}>
-                <ChartTooltipRow label="Compliance" value={`${point.compliancePercentage.toFixed(0)}%`} />
+              <ChartTooltip active={active} title={point.name}>
+                <ChartTooltipRow colorHex={chartTheme.blue} label="BRS score" value={point.score.toFixed(1)} />
               </ChartTooltip>
             );
           }}
         />
         <Bar
-          dataKey="compliancePercentage"
+          dataKey="score"
           radius={[0, 4, 4, 0]}
-          maxBarSize={24}
+          maxBarSize={20}
           isAnimationActive={isAnimationActive}
           animationDuration={700}
           animationEasing="ease-out"
           onMouseEnter={(_, index) => setActiveIndex(index)}
           onMouseLeave={() => setActiveIndex(null)}
         >
-          {points.map((entry, index) => {
-            const paletteIndex = index % CATEGORICAL_PALETTE.length;
+          {repositories.map((repo, index) => {
             const isDimmed = activeIndex !== null && activeIndex !== index;
             const isGlowing = activeIndex === index;
             return (
               <Cell
-                key={entry.shortCode}
-                fill={`url(#${ids.categorical(paletteIndex)})`}
-                opacity={isDimmed ? 0.35 : 1}
+                key={repo.name}
+                fill={`url(#${ids.blue})`}
+                stroke={chartTheme.blue}
+                strokeWidth={isGlowing ? 1 : 0}
+                opacity={isDimmed ? 0.4 : 1}
                 style={{
                   transition: "opacity 200ms ease, filter 200ms ease",
-                  filter: isGlowing ? `drop-shadow(0 0 6px ${CATEGORICAL_PALETTE[paletteIndex][chartTheme.mode]}80)` : undefined,
+                  filter: isGlowing ? `drop-shadow(0 0 6px ${chartTheme.blue}80)` : undefined,
                 }}
               />
             );

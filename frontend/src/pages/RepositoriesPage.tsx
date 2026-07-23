@@ -2,13 +2,14 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Database, ExternalLink, Plus, ScanLine } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
-import { Card } from "../components/ui/Card";
+import { Card, CardContent, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/EmptyState";
 import { SkeletonTable } from "../components/ui/Skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../components/ui/Table";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
+import { RepositoryActivityChart } from "../components/charts/RepositoryActivityChart";
 import { useRepositories, useSetScheduledScan } from "../hooks/useRepositories";
 import { useScanJobs } from "../hooks/useScanJobs";
 import { usePermissions } from "../hooks/usePermissions";
@@ -51,6 +52,16 @@ export default function RepositoriesPage() {
       if (!byRepo.has(job.repository_id)) byRepo.set(job.repository_id, job);
     }
     return byRepo;
+  }, [scanJobsData]);
+  const repositoryActivity = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const job of scanJobsData?.scan_jobs ?? []) {
+      counts.set(job.repository_name, (counts.get(job.repository_name) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([name, scanCount]) => ({ name, scanCount }))
+      .sort((a, b) => b.scanCount - a.scanCount)
+      .slice(0, 8);
   }, [scanJobsData]);
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
@@ -118,6 +129,22 @@ export default function RepositoriesPage() {
         />
       ) : (
         <RevealSection>
+          {/* Always mounted alongside the table below (not conditionally
+              added once `repositoryActivity` finishes loading) so it joins
+              the same stagger group `RevealSection` observes on first
+              paint — a `RevealItem` mounted later, after data resolves,
+              would never receive that initial reveal transition and could
+              stay stuck at its `hidden` (opacity: 0) variant. */}
+          <RevealItem className="mb-4">
+            {repositoryActivity.length > 0 && (
+              <Card>
+                <CardHeader title="Repository activity" description="Completed scans per repository." />
+                <CardContent>
+                  <RepositoryActivityChart repositories={repositoryActivity} />
+                </CardContent>
+              </Card>
+            )}
+          </RevealItem>
           <RevealItem>
             <Card>
               <Table>
