@@ -1,7 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import type { TokenResponse } from "../../types/api";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://13.127.41.204.sslip.io/api/v1";
 
 const ACCESS_TOKEN_KEY = "kavach.access_token";
 const REFRESH_TOKEN_KEY = "kavach.refresh_token";
