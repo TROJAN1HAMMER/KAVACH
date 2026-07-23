@@ -1,7 +1,6 @@
 import { Hero } from "../components/landing/Hero";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { StatHighlights } from "../components/landing/StatHighlights";
-import { ArchitecturePreview } from "../components/landing/ArchitecturePreview";
 import { SystemPillars } from "../components/landing/SystemPillars";
 
 export default function OverviewPage() {
@@ -20,12 +19,6 @@ export default function OverviewPage() {
         </RevealItem>
         <RevealItem>
           <StatHighlights />
-        </RevealItem>
-      </RevealSection>
-
-      <RevealSection>
-        <RevealItem>
-          <ArchitecturePreview />
         </RevealItem>
       </RevealSection>
 

@@ -1,9 +1,15 @@
-import { Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { FullPageSpinner } from "../ui/Spinner";
 import { useGlobalScanJobsWatcher } from "../../hooks/useScanJobs";
+import { useCommandPaletteShortcut } from "../command-palette/useCommandPaletteShortcut";
+
+// Lazy-loaded so its bundle (Fuse.js + the palette UI) only ships once a
+// user actually opens it (Ctrl/Cmd+K or the topbar search icon) — never as
+// part of the initial authenticated-shell bundle.
+const CommandPalette = lazy(() => import("../command-palette/CommandPalette").then((m) => ({ default: m.CommandPalette })));
 
 export function AppShell() {
   // Icon-only rail is the resting state everywhere (desktop included) —
@@ -17,6 +23,17 @@ export function AppShell() {
   // is open — see useGlobalScanJobsWatcher's docstring for why this is
   // needed on top of each page's own data fetching.
   useGlobalScanJobsWatcher();
+
+  // Command palette — state lives here (not in a context) so it follows
+  // the same pattern as `sidebarExpanded` below: local state in AppShell,
+  // passed down to whichever child needs to read/toggle it.
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteEverOpened, setPaletteEverOpened] = useState(false);
+  const openPalette = () => {
+    setPaletteEverOpened(true);
+    setPaletteOpen(true);
+  };
+  useCommandPaletteShortcut(openPalette);
 
   // Collapse back to the icon rail on navigation — adjusting state during
   // render (React's documented alternative to an effect for "reset when a
@@ -48,13 +65,19 @@ export function AppShell() {
         onCollapse={() => setSidebarExpanded(false)}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+        <Topbar onOpenPalette={openPalette} sidebarExpanded={sidebarExpanded} />
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Suspense fallback={<FullPageSpinner />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
+
+      {paletteEverOpened && (
+        <Suspense fallback={null}>
+          <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

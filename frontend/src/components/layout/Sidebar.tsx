@@ -112,15 +112,15 @@ export function Sidebar({
             title={expanded ? undefined : label}
             className={({ isActive }) =>
               cn(
-                "flex w-full items-center overflow-hidden rounded-lg py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 ease-out",
+                "sidebar-nav-link flex w-full items-center overflow-hidden rounded-lg py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-200 ease-out",
                 expanded ? "justify-start gap-3 px-3" : "justify-center px-0",
                 isActive
-                  ? "bg-accent text-accent-foreground"
+                  ? "is-active bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )
             }
           >
-            <Icon className="size-6 shrink-0" />
+            <Icon className="sidebar-nav-icon size-6 shrink-0" />
             {/* `max-w-0` (not just opacity) when collapsed — otherwise the
                 label keeps its full text width even while invisible, which
                 widens the link past the rail and clips the active pill. */}
