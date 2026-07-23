@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Database, ExternalLink, Plus, ScanLine } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -10,9 +10,25 @@ import { SkeletonTable } from "../components/ui/Skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../components/ui/Table";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { useRepositories, useSetScheduledScan } from "../hooks/useRepositories";
+import { useScanJobs } from "../hooks/useScanJobs";
 import { usePermissions } from "../hooks/usePermissions";
 import { NewScanModal } from "../components/scans/NewScanModal";
-import type { Repository } from "../types/api";
+import { formatDateTime, formatScore } from "../lib/utils";
+import type { Repository, ScanJobStatusResponse } from "../types/api";
+
+function riskTone(riskLevel: string | null): "neutral" | "success" | "warning" | "danger" {
+  switch (riskLevel?.toUpperCase()) {
+    case "CRITICAL":
+    case "HIGH":
+      return "danger";
+    case "MEDIUM":
+      return "warning";
+    case "LOW":
+      return "success";
+    default:
+      return "neutral";
+  }
+}
 
 const PROVIDER_LABEL: Record<Repository["provider"], string> = {
   github: "GitHub",
@@ -24,12 +40,44 @@ const PROVIDER_LABEL: Record<Repository["provider"], string> = {
 export default function RepositoriesPage() {
   const { data: repositories, isLoading, isError } = useRepositories();
   const setScheduledScan = useSetScheduledScan();
+  // Repository-specific security posture — the latest completed scan per
+  // repository, joined onto the repositories table below. Same hook/call
+  // shape used by every other dashboard page, just a new call site.
+  const { data: scanJobsData } = useScanJobs({ status: "completed", limit: 100 });
+  const latestScanByRepo = useMemo(() => {
+    const byRepo = new Map<string, ScanJobStatusResponse>();
+    const sorted = [...(scanJobsData?.scan_jobs ?? [])].sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""));
+    for (const job of sorted) {
+      if (!byRepo.has(job.repository_id)) byRepo.set(job.repository_id, job);
+    }
+    return byRepo;
+  }, [scanJobsData]);
   const navigate = useNavigate();
   const { hasPermission } = usePermissions();
   const canCreateScan = hasPermission("scan:create");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [rescanTarget, setRescanTarget] = useState<Repository | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Lets the command palette's "Start New Scan"/"Connect Repository" quick
+  // actions deep-link straight into this page's existing modal instead of
+  // just landing on the list. Adjusted during render (React's documented
+  // alternative to an effect for "reset/react to a prop changing," same
+  // pattern AppShell uses for `lastPathname`) rather than in a `useEffect`,
+  // guarded by `autoOpenHandled` so it only ever fires once per visit even
+  // though `searchParams` keeps the same identity across re-renders.
+  const [autoOpenHandled, setAutoOpenHandled] = useState(false);
+  if (!autoOpenHandled && searchParams.get("new-scan") === "1") {
+    setAutoOpenHandled(true);
+    if (canCreateScan) {
+      setRescanTarget(null);
+      setModalOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("new-scan");
+    setSearchParams(next, { replace: true });
+  }
 
   return (
     <div>
@@ -78,6 +126,7 @@ export default function RepositoriesPage() {
                     <TableHeaderCell>Repository</TableHeaderCell>
                     <TableHeaderCell>Provider</TableHeaderCell>
                     <TableHeaderCell>Default branch</TableHeaderCell>
+                    <TableHeaderCell>Security posture</TableHeaderCell>
                     <TableHeaderCell>Nightly rescan</TableHeaderCell>
                     <TableHeaderCell className="text-right">Actions</TableHeaderCell>
                   </tr>
@@ -105,6 +154,21 @@ export default function RepositoriesPage() {
                         <Badge tone="neutral">{PROVIDER_LABEL[repo.provider]}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{repo.default_branch || "—"}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const latestScan = latestScanByRepo.get(repo.id);
+                          if (!latestScan) return <span className="text-xs text-muted-foreground">Not yet scanned</span>;
+                          return (
+                            <div className="flex items-center gap-2">
+                              <Badge tone={riskTone(latestScan.brs_risk_level)}>{latestScan.brs_risk_level ?? "—"}</Badge>
+                              <div className="text-xs text-muted-foreground">
+                                <div className="tabular-nums text-foreground">BRS {formatScore(latestScan.brs_score)}</div>
+                                <div>{formatDateTime(latestScan.finished_at)}</div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <label className="inline-flex cursor-pointer items-center gap-2">
                           <input

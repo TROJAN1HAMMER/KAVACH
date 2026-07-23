@@ -38,13 +38,26 @@ export default function FindingExplorerPage() {
 
   const [query, setQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<Severity | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+
+  const categories = useMemo(
+    () => [...new Set((findingsData?.findings ?? []).map((f) => f.category))].sort(),
+    [findingsData],
+  );
+  const sources = useMemo(
+    () => [...new Set((findingsData?.findings ?? []).map((f) => f.source))].sort(),
+    [findingsData],
+  );
 
   const filtered = useMemo(() => {
     const findings = findingsData?.findings ?? [];
     const q = query.trim().toLowerCase();
     return findings.filter((f) => {
       if (severityFilter !== "all" && f.severity !== severityFilter) return false;
+      if (categoryFilter !== "all" && f.category !== categoryFilter) return false;
+      if (sourceFilter !== "all" && f.source !== sourceFilter) return false;
       if (!q) return true;
       return (
         f.title.toLowerCase().includes(q) ||
@@ -54,7 +67,7 @@ export default function FindingExplorerPage() {
         f.package?.toLowerCase().includes(q)
       );
     });
-  }, [findingsData, query, severityFilter]);
+  }, [findingsData, query, severityFilter, categoryFilter, sourceFilter]);
 
   if (loadingScans) return <FullPageSpinner />;
 
@@ -102,6 +115,22 @@ export default function FindingExplorerPage() {
           {SEVERITY_ORDER.map((sev) => (
             <option key={sev} value={sev}>
               {sev}
+            </option>
+          ))}
+        </Select>
+        <Select className="sm:w-48" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+          <option value="all">All categories</option>
+          {categories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </Select>
+        <Select className="sm:w-48" value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+          <option value="all">All sources</option>
+          {sources.map((source) => (
+            <option key={source} value={source}>
+              {source}
             </option>
           ))}
         </Select>

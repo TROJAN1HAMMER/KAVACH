@@ -22,6 +22,22 @@ export function extractSeverityCounts(
   return counts;
 }
 
+// Same rationale as `extractSeverityCounts` above, but for the *other*
+// nested dict `summary` carries — `by_source` (scanner-engine name -> finding
+// count) — used to show which scanner engines are contributing findings
+// across the portfolio (Risk Dashboard's "scanner contribution" chart).
+export function extractSourceCounts(
+  summary: Record<string, unknown> | null | undefined,
+): Record<string, number> {
+  const bySource = summary?.by_source;
+  if (!bySource || typeof bySource !== "object") return {};
+  const counts: Record<string, number> = {};
+  for (const [source, value] of Object.entries(bySource as Record<string, unknown>)) {
+    if (typeof value === "number") counts[source] = value;
+  }
+  return counts;
+}
+
 interface SeverityStyle {
   label: string;
   text: string;

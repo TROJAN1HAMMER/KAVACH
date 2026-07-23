@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, ShieldAlert, TrendingUp, Zap } from "lucide-react";
+import { AlertTriangle, Radar, ShieldAlert, TrendingUp, Zap } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { PageHeader } from "../components/ui/PageHeader";
 import { StatTile } from "../components/ui/StatTile";
@@ -11,10 +11,14 @@ import { Badge } from "../components/ui/Badge";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "../components/ui/Table";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { BrsTrendChart } from "../components/charts/BrsTrendChart";
+import { SeverityDistributionChart } from "../components/charts/SeverityDistributionChart";
+import { RiskHeatmap, type RiskHeatmapRow } from "../components/risk/RiskHeatmap";
 import { useScanJobs } from "../hooks/useScanJobs";
 import { useTheme } from "../hooks/useTheme";
 import { useChartEntryAnimation } from "../hooks/useChartEntryAnimation";
+import { extractSeverityCounts, extractSourceCounts, CATEGORICAL_PALETTE } from "../lib/severity";
 import { formatDateTime, formatScore } from "../lib/utils";
+import type { Severity } from "../types/api";
 
 function riskTone(riskLevel: string | null): "neutral" | "success" | "warning" | "danger" {
   switch (riskLevel?.toUpperCase()) {
@@ -50,6 +54,37 @@ export default function RiskDashboardPage() {
     return { avg, highRiskCount, totalFindings, riskiest };
   }, [completedJobs]);
 
+  // Portfolio-wide severity/scanner-contribution/ASE — this is the "deep
+  // analytical" breakdown the Executive Summary page deliberately no longer
+  // shows (it stays business-framed there); this page owns it instead.
+  const portfolioBreakdown = useMemo(() => {
+    const severityTotals: Partial<Record<Severity, number>> = {};
+    const sourceTotals: Record<string, number> = {};
+    let aseSum = 0;
+    let aseCount = 0;
+
+    for (const job of completedJobs) {
+      for (const [severity, count] of Object.entries(extractSeverityCounts(job.summary))) {
+        severityTotals[severity as Severity] = (severityTotals[severity as Severity] ?? 0) + count;
+      }
+      for (const [source, count] of Object.entries(extractSourceCounts(job.summary))) {
+        sourceTotals[source] = (sourceTotals[source] ?? 0) + count;
+      }
+      if (job.attack_surface_exposure_score !== null) {
+        aseSum += job.attack_surface_exposure_score;
+        aseCount += 1;
+      }
+    }
+
+    return {
+      severityTotals,
+      avgAse: aseCount > 0 ? aseSum / aseCount : null,
+      sourceContribution: Object.entries(sourceTotals)
+        .map(([source, count]) => ({ source, count }))
+        .sort((a, b) => b.count - a.count),
+    };
+  }, [completedJobs]);
+
   const trendPoints = useMemo(
     () =>
       [...completedJobs]
@@ -75,6 +110,27 @@ export default function RiskDashboardPage() {
     return [...byRepo.values()].sort((a, b) => b.score - a.score).slice(0, 8);
   }, [completedJobs]);
 
+  // Repository x severity grid — latest scan per repository (`completedJobs`
+  // is already sorted newest-first, so the first occurrence of a
+  // `repository_id` while walking it *is* that repo's latest scan), ranked
+  // by critical-then-high finding count so the riskiest repos sit at top.
+  const heatmapRows = useMemo<RiskHeatmapRow[]>(() => {
+    const seen = new Set<string>();
+    const rows: RiskHeatmapRow[] = [];
+    for (const job of completedJobs) {
+      if (seen.has(job.repository_id)) continue;
+      seen.add(job.repository_id);
+      rows.push({
+        repositoryId: job.repository_id,
+        repositoryName: job.repository_name,
+        counts: extractSeverityCounts(job.summary),
+      });
+    }
+    return rows
+      .sort((a, b) => (b.counts.CRITICAL ?? 0) - (a.counts.CRITICAL ?? 0) || (b.counts.HIGH ?? 0) - (a.counts.HIGH ?? 0))
+      .slice(0, 8);
+  }, [completedJobs]);
+
   const gridColor = theme === "dark" ? "#2c2c2a" : "#e1e0d9";
   const axisColor = theme === "dark" ? "#c3c2b7" : "#52514e";
   const blueHex = theme === "dark" ? "#3987e5" : "#2a78d6";
@@ -84,7 +140,7 @@ export default function RiskDashboardPage() {
     return (
       <div>
         <PageHeader title="Risk Dashboard" description="Banking Risk Score trends across every completed scan." />
-        <SkeletonStatTiles className="mb-6" />
+        <SkeletonStatTiles className="mb-6" count={5} />
         <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <SkeletonChartCard height={280} />
           <SkeletonChartCard height={280} />
@@ -109,9 +165,12 @@ export default function RiskDashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Risk Dashboard" description="Banking Risk Score trends across every completed scan." />
+      <PageHeader
+        title="Risk Dashboard"
+        description="Deep analytical view of the portfolio's risk posture — trends, severity, exposure, and scanner contribution."
+      />
 
-      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <RevealItem>
           <StatTile label="Average BRS" value={formatScore(stats?.avg)} icon={<TrendingUp className="size-5" />} />
         </RevealItem>
@@ -124,6 +183,13 @@ export default function RiskDashboardPage() {
         </RevealItem>
         <RevealItem>
           <StatTile label="Total findings" value={stats?.totalFindings ?? 0} icon={<Zap className="size-5" />} />
+        </RevealItem>
+        <RevealItem>
+          <StatTile
+            label="Avg. Attack Surface Exposure"
+            value={formatScore(portfolioBreakdown.avgAse)}
+            icon={<Radar className="size-5" />}
+          />
         </RevealItem>
         <RevealItem>
           <StatTile
@@ -146,7 +212,7 @@ export default function RiskDashboardPage() {
 
         <RevealItem>
           <Card className="h-full">
-            <CardHeader title="Riskiest repositories" description="Highest Banking Risk Score per repository." />
+            <CardHeader title="Repository comparison" description="Highest Banking Risk Score per repository." />
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={topRepos} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
@@ -178,6 +244,59 @@ export default function RiskDashboardPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
+
+      <RevealSection className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Findings by severity" description="Aggregated across every completed scan." />
+            <CardContent>
+              <SeverityDistributionChart counts={portfolioBreakdown.severityTotals} />
+            </CardContent>
+          </Card>
+        </RevealItem>
+
+        <RevealItem>
+          <Card className="h-full">
+            <CardHeader title="Scanner contribution" description="Findings logged per scanner engine, portfolio-wide." />
+            <CardContent>
+              <ResponsiveContainer width="100%" height={260}>
+                <BarChart data={portfolioBreakdown.sourceContribution} margin={{ top: 8, right: 8, left: -16, bottom: 0 }} barCategoryGap="30%">
+                  <CartesianGrid vertical={false} stroke={gridColor} />
+                  <XAxis dataKey="source" tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={{ stroke: gridColor }} />
+                  <YAxis allowDecimals={false} tick={{ fill: axisColor, fontSize: 12 }} tickLine={false} axisLine={false} width={40} />
+                  <Tooltip
+                    cursor={{ fill: theme === "dark" ? "rgba(255,255,255,0.04)" : "rgba(11,11,11,0.03)" }}
+                    contentStyle={{
+                      background: theme === "dark" ? "#1a1a19" : "#fcfcfb",
+                      border: `1px solid ${gridColor}`,
+                      borderRadius: 8,
+                      fontSize: 12,
+                      color: theme === "dark" ? "#ffffff" : "#0b0b0b",
+                    }}
+                    formatter={(value) => [Number(value), "Findings"]}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={chartAnimationActive} animationDuration={700} animationEasing="ease-out">
+                    {portfolioBreakdown.sourceContribution.map((entry, index) => (
+                      <Cell key={entry.source} fill={CATEGORICAL_PALETTE[index % CATEGORICAL_PALETTE.length][theme]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </RevealItem>
+      </RevealSection>
+
+      <RevealSection className="mb-6">
+        <RevealItem>
+          <Card>
+            <CardHeader title="Business risk heatmap" description="Finding severity concentration per repository, most critical first." />
+            <CardContent>
+              <RiskHeatmap rows={heatmapRows} />
             </CardContent>
           </Card>
         </RevealItem>

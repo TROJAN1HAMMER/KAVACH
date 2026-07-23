@@ -1,10 +1,11 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CheckCircle2, ClipboardCheck, XCircle } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Download, XCircle } from "lucide-react";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardContent, CardHeader } from "../components/ui/Card";
 import { Select } from "../components/ui/Input";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { FullPageSpinner } from "../components/ui/Spinner";
 import { SkeletonChartCard, SkeletonTable } from "../components/ui/Skeleton";
@@ -14,10 +15,49 @@ import { SeverityBadge } from "../components/ui/Badge";
 import { RevealSection, RevealItem } from "../components/landing/RevealSection";
 import { ComplianceBarChart } from "../components/charts/ComplianceBarChart";
 import { useScanJobs } from "../hooks/useScanJobs";
-import { useCompliance } from "../hooks/useFindings";
+import { useCompliance, useReportStatus } from "../hooks/useFindings";
+import { usePermissions } from "../hooks/usePermissions";
+import { reportsApi } from "../lib/api/reports";
+import { formatDateTime } from "../lib/utils";
+
+/** Reuses the exact per-scan report-download mechanism `ScanDetailPanel`
+ *  already has, scoped to the currently-selected scan's compliance_report
+ *  artifact — this page is single-scan-scoped already (via the picker
+ *  above), so "downloadable reports" means this scan's compliance report. */
+function ComplianceReportButton({ scanJobId, repositoryName }: { scanJobId: string; repositoryName: string }) {
+  const { data: reportStatus } = useReportStatus(scanJobId);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!reportStatus?.compliance_report_available) return null;
+
+  const handleDownload = async () => {
+    setError(null);
+    setIsDownloading(true);
+    try {
+      await reportsApi.download(scanJobId, "compliance_report", `${repositoryName}-compliance-report`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  return (
+    <div>
+      <Button variant="secondary" size="sm" isLoading={isDownloading} onClick={handleDownload}>
+        <Download className="size-3.5" />
+        Download report
+      </Button>
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
 
 export default function ComplianceDashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { hasPermission } = usePermissions();
+  const canDownloadReports = hasPermission("report:download");
   const { data: scanJobsData, isLoading: loadingScans } = useScanJobs({ status: "completed", limit: 100 });
 
   const completedJobs = useMemo(
@@ -34,6 +74,7 @@ export default function ComplianceDashboardPage() {
   }, [completedJobs, searchParams, setSearchParams]);
 
   const { data: compliance, isLoading: loadingCompliance } = useCompliance(selectedScanId || undefined);
+  const selectedJob = completedJobs.find((job) => job.scan_job_id === selectedScanId);
 
   if (loadingScans) return <FullPageSpinner />;
 
@@ -56,17 +97,22 @@ export default function ComplianceDashboardPage() {
         title="Compliance Dashboard"
         description="RBI IT Framework, PCI-DSS v4, and SWIFT CSP compliance for a selected scan."
         action={
-          <Select
-            className="w-64"
-            value={selectedScanId}
-            onChange={(e) => setSearchParams({ scan: e.target.value })}
-          >
-            {completedJobs.map((job) => (
-              <option key={job.scan_job_id} value={job.scan_job_id}>
-                {job.repository_name} — {new Date(job.finished_at ?? "").toLocaleDateString()}
-              </option>
-            ))}
-          </Select>
+          <div className="flex flex-wrap items-center gap-3">
+            <Select
+              className="w-64"
+              value={selectedScanId}
+              onChange={(e) => setSearchParams({ scan: e.target.value })}
+            >
+              {completedJobs.map((job) => (
+                <option key={job.scan_job_id} value={job.scan_job_id}>
+                  {job.repository_name} — {new Date(job.finished_at ?? "").toLocaleDateString()}
+                </option>
+              ))}
+            </Select>
+            {canDownloadReports && selectedJob && (
+              <ComplianceReportButton scanJobId={selectedJob.scan_job_id} repositoryName={selectedJob.repository_name} />
+            )}
+          </div>
         }
       />
 
@@ -94,6 +140,9 @@ export default function ComplianceDashboardPage() {
                     className="mt-3"
                   />
                   <p className="mt-2 text-xs text-muted-foreground">Across {compliance.frameworks.length} framework(s)</p>
+                  {selectedJob?.finished_at && (
+                    <p className="mt-1 text-xs text-muted-foreground">Last evaluated {formatDateTime(selectedJob.finished_at)}</p>
+                  )}
                 </CardContent>
               </Card>
             </RevealItem>
