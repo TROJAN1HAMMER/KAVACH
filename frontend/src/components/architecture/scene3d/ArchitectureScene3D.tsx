@@ -5,17 +5,19 @@ import { RotateCcw } from "lucide-react";
 import { Button } from "../../ui/Button";
 import { ARCH_COMPONENTS, getComponent, type ArchComponentId } from "../componentData";
 import { CATEGORY_COLORS, SCENE_BACKGROUND } from "./categoryColors";
-import { computeArchitectureLayout } from "./useArchitectureLayout";
+import { computeArchitectureLayout, HUB_ID } from "./useArchitectureLayout";
 import { buildEdges, type SceneEdge } from "./connections";
 import { computeUpstreamPath } from "./pathHighlight";
 import { ArchitectureNode3D } from "./ArchitectureNode3D";
 import { ConnectionPath3D } from "./ConnectionPath3D";
 import { DataPackets3D } from "./DataPackets3D";
-import { NodeInfoPanel } from "./NodeInfoPanel";
+import { NodeSidePanel } from "./NodeSidePanel";
 import { ArchitectureBackground3D } from "./ArchitectureBackground3D";
+import { VolumetricLightCone } from "./VolumetricLightCone";
+import { SceneEffects } from "./SceneEffects";
+import { OrbitDriver } from "./OrbitDriver";
+import { useQualityTier } from "./useQualityTier";
 import { CameraRig } from "./CameraRig";
-
-const HUB_ID: ArchComponentId = "celery-workers";
 
 const REST_POSITION = new THREE.Vector3(2, 9.5, 25);
 const REST_TARGET = new THREE.Vector3(1, 0.5, 0);
@@ -27,11 +29,12 @@ function colorForEdge(edge: SceneEdge): string {
 
 /**
  * The `<Canvas>` root: camera, lighting, background, and every child layer (nodes, connections,
- * packets, the floating info panel, camera rig). Owns the single source of truth for
+ * packets, the side panel, camera rig, postprocessing). Owns the single source of truth for
  * "currently hovered/focused node" so highlighting logic lives in one place instead of being
  * duplicated per child.
  */
 export function ArchitectureScene3D() {
+  const tier = useQualityTier();
   const layout = useMemo(() => computeArchitectureLayout(), []);
   const edges = useMemo(() => buildEdges(layout), [layout]);
 
@@ -50,26 +53,38 @@ export function ArchitectureScene3D() {
     setFocusedId((current) => (current === id ? null : id));
   }, []);
 
-  const activeComponent = activeId ? getComponent(activeId) : null;
-  const activePosition = activeId ? layout[activeId].position : null;
+  const focusedComponent = focusedId ? getComponent(focusedId) : null;
+  const hubPosition = layout[HUB_ID].position;
+  const aiPosition = layout["ai-layer"].position;
 
   return (
     <div className="relative h-full w-full">
       <Canvas
-        dpr={[1, 1.75]}
+        dpr={tier === "desktop" ? [1, 1.75] : tier === "tablet" ? [1, 1.4] : [1, 1]}
         gl={{ antialias: true }}
         camera={{ position: INTRO_START_POSITION.toArray(), fov: 50, near: 0.1, far: 200 }}
         onPointerMissed={() => setFocusedId(null)}
       >
         <color attach="background" args={[SCENE_BACKGROUND]} />
-        <fog attach="fog" args={[SCENE_BACKGROUND, 28, 68]} />
+        <fog attach="fog" args={[SCENE_BACKGROUND, 24, 74]} />
 
         <ambientLight intensity={0.55} />
         <directionalLight position={[12, 16, 10]} intensity={1.15} color="#bcd7ff" />
         <pointLight position={[-16, -6, 8]} intensity={0.4} color="#22d3ee" />
         <pointLight position={[0, 4, -10]} intensity={0.25} color="#7db4f2" />
 
-        <ArchitectureBackground3D />
+        {/* Must mount first so its useFrame (default priority, subscription order) runs before
+            anything below reads a scanner's position or a dynamic edge's curve this frame. */}
+        <OrbitDriver layout={layout} edges={edges} />
+
+        <ArchitectureBackground3D tier={tier} />
+
+        {tier !== "mobile" && (
+          <>
+            <VolumetricLightCone position={hubPosition} color="#5b8def" height={10} radius={2.6} />
+            <VolumetricLightCone position={aiPosition} color="#c084fc" height={7} radius={1.8} />
+          </>
+        )}
 
         {edges.map((edge) => {
           const onPath = Boolean(highlightedIds?.has(edge.from) && highlightedIds?.has(edge.to));
@@ -79,6 +94,7 @@ export function ArchitectureScene3D() {
               curve={edge.curve}
               isHighlighted={onPath}
               isDimmed={highlightedIds !== null && !onPath}
+              isDynamic={edge.isDynamic}
             />
           );
         })}
@@ -95,14 +111,13 @@ export function ArchitectureScene3D() {
               phase={layout[component.id].phase}
               isHub={component.id === HUB_ID}
               isActive={hoveredId === component.id || focusedId === component.id}
+              isHovered={hoveredId === component.id}
               isDimmed={highlightedIds !== null && !onPath}
               onHoverChange={setHoveredId}
               onSelect={handleSelect}
             />
           );
         })}
-
-        {activeComponent && activePosition && <NodeInfoPanel component={activeComponent} position={activePosition} />}
 
         <CameraRig
           restPosition={REST_POSITION}
@@ -112,6 +127,8 @@ export function ArchitectureScene3D() {
           focusKey={focusedId}
           resetSignal={resetSignal}
         />
+
+        <SceneEffects tier={tier} />
       </Canvas>
 
       {/* The only other camera-movement trigger besides clicking a node (see CameraRig's
@@ -127,6 +144,8 @@ export function ArchitectureScene3D() {
         <RotateCcw className="size-3.5" />
         Reset View
       </Button>
+
+      <NodeSidePanel component={focusedComponent} onClose={() => setFocusedId(null)} />
     </div>
   );
 }

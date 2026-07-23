@@ -17,11 +17,15 @@ const WAVE_Y_AMPLITUDE = 1.3;
 const RING_RADIUS = 5.6;
 const RING_FORWARD_OFFSET = 2.6;
 
-const HUB_ID: ArchComponentId = "celery-workers";
+/** Radians/second the 6 scanners drift around the hub — slow enough to read as ambient motion,
+ *  not a spinning carousel (a full revolution takes roughly two minutes). */
+export const SCANNER_ORBIT_SPEED = 0.05;
+
+export const HUB_ID: ArchComponentId = "celery-workers";
 
 /** Small deterministic hash so per-node jitter/phase is stable across renders without storing
  *  extra state or touching `componentData.ts`. */
-function hashId(id: string): number {
+export function hashId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
   return Math.abs(h);
@@ -37,7 +41,7 @@ function phaseFor(id: string): number {
  * on the upper shoulders, Secrets-Detection/Dependency-Analysis on the lower shoulders, and
  * Configuration Scanner at the bottom.
  */
-const RING_ANGLES: Partial<Record<ArchComponentId, number>> = {
+export const RING_ANGLES: Partial<Record<ArchComponentId, number>> = {
   semgrep: Math.PI / 2,
   "ast-grep": Math.PI / 6,
   joern: (Math.PI * 5) / 6,
@@ -89,4 +93,26 @@ export function computeArchitectureLayout(): ArchitectureLayout {
   };
 
   return layout;
+}
+
+/**
+ * Live position for one of the 6 `FAN_OUT` scanners at a given elapsed time — the exact same
+ * ring formula `computeArchitectureLayout` uses at t=0, plus a slow constant angular drift, so
+ * mount-time position matches perfectly and then eases into the orbit. Writes into `target`
+ * in place (rather than allocating a new `Vector3` every frame) so callers can pass the same
+ * mutable `layout[id].position` object every node/edge already holds a reference to — nothing
+ * downstream needs to know positions are now time-varying for these 6 ids.
+ */
+export function computeScannerOrbitPosition(
+  id: ArchComponentId,
+  hub: THREE.Vector3,
+  elapsed: number,
+  target: THREE.Vector3,
+): THREE.Vector3 {
+  const angle = (RING_ANGLES[id] ?? 0) + elapsed * SCANNER_ORBIT_SPEED;
+  const jitter = ((hashId(id) % 5) - 2) * 0.25;
+  const x = hub.x + Math.cos(angle) * RING_RADIUS;
+  const y = hub.y + Math.sin(angle) * RING_RADIUS * 0.62;
+  const z = hub.z + RING_FORWARD_OFFSET + jitter;
+  return target.set(x, y, z);
 }
