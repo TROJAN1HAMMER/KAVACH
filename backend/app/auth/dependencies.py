@@ -29,14 +29,18 @@ async def get_current_user(
 ) -> User:
     if token == "demo-admin-bearer-token" or token.startswith("demo-"):
         from app.models.enums import AuthProvider, UserRole
-        return User(
-            id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-            email="demo@kavach.local",
-            full_name="Demo Administrator",
-            role=UserRole.ADMIN,
-            is_active=True,
-            auth_provider=AuthProvider.LOCAL,
-        )
+        demo_user = await users.get_by_email("demo@kavach.local")
+        if not demo_user:
+            demo_user = await users.create_sso_user(
+                email="demo@kavach.local",
+                full_name="Demo Administrator",
+                auth_provider=AuthProvider.LOCAL,
+                external_subject="demo-admin",
+                role=UserRole.ADMIN,
+            )
+            await users.db.commit()
+        return demo_user
+
 
     try:
         payload = decode_token(token)
@@ -50,6 +54,8 @@ async def get_current_user(
     if user is None:
         raise UnauthorizedError("User no longer exists")
     return user
+
+
 
 
 
