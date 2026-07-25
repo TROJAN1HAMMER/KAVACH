@@ -1,10 +1,37 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import type { TokenResponse } from "../../types/api";
+import type { TokenResponse, User } from "../../types/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://13.127.41.204.sslip.io/api/v1";
 
 const ACCESS_TOKEN_KEY = "kavach.access_token";
 const REFRESH_TOKEN_KEY = "kavach.refresh_token";
+const DEMO_SESSION_KEY = "kavach.demo_session";
+const DEMO_USER_KEY = "kavach.demo_user";
+
+export const isDemoEnabled = () => import.meta.env.VITE_ENABLE_DEMO_LOGIN === "true";
+
+export const demoStorage = {
+  isDemoSession: () => localStorage.getItem(DEMO_SESSION_KEY) === "true",
+  getDemoUser: (): User | null => {
+    const raw = localStorage.getItem(DEMO_USER_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+  setDemoSession: (user: User) => {
+    localStorage.setItem(DEMO_SESSION_KEY, "true");
+    localStorage.setItem(DEMO_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(ACCESS_TOKEN_KEY, "demo-admin-bearer-token");
+    localStorage.setItem(REFRESH_TOKEN_KEY, "demo-admin-refresh-token");
+  },
+  clearDemoSession: () => {
+    localStorage.removeItem(DEMO_SESSION_KEY);
+    localStorage.removeItem(DEMO_USER_KEY);
+  },
+};
 
 export const tokenStorage = {
   getAccessToken: () => localStorage.getItem(ACCESS_TOKEN_KEY),
@@ -16,6 +43,7 @@ export const tokenStorage = {
   clear: () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    demoStorage.clearDemoSession();
   },
 };
 
@@ -71,6 +99,11 @@ apiClient.interceptors.response.use(
     }
     config._retried = true;
 
+    if (demoStorage.isDemoSession()) {
+      // In demo mode, bypass token expiry logout on 401 responses
+      throw error;
+    }
+
     // Multiple requests can 401 at once (e.g. a page firing several
     // queries in parallel) — share one in-flight refresh instead of
     // racing the refresh endpoint multiple times.
@@ -91,3 +124,4 @@ apiClient.interceptors.response.use(
     return apiClient(config);
   },
 );
+

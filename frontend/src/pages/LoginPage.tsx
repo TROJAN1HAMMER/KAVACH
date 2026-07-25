@@ -7,15 +7,18 @@ import { Input, Label } from "../components/ui/Input";
 import { Card } from "../components/ui/Card";
 import { isAxiosError } from "axios";
 import { defaultRouteForRole } from "../lib/rbac";
+import { isDemoEnabled } from "../lib/api/client";
 
 export default function LoginPage() {
-  const { login, status, user } = useAuth();
+  const { login, loginDemo, status, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const showDemoButton = isDemoEnabled();
 
   if (status === "authenticated") {
     // Send a role back to wherever it was headed (e.g. a deep link) if we
@@ -49,6 +52,12 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDemoLogin = () => {
+    const demoUser = loginDemo();
+    const redirectTo = (location.state as { from?: string } | null)?.from ?? defaultRouteForRole(demoUser.role);
+    navigate(redirectTo, { replace: true });
   };
 
   return (
@@ -97,7 +106,24 @@ export default function LoginPage() {
             Sign in
           </Button>
         </form>
+
+        {showDemoButton && (
+          <div className="mt-6 border-t border-border pt-4 text-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary"
+              onClick={handleDemoLogin}
+            >
+              🚀 Enter Demo Mode
+            </Button>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Development-only authentication bypass
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );
 }
+

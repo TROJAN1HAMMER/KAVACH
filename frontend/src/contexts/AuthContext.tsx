@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { authApi } from "../lib/api/auth";
-import { onUnauthorized, tokenStorage } from "../lib/api/client";
+import { demoStorage, isDemoEnabled, onUnauthorized, tokenStorage } from "../lib/api/client";
 import type { User } from "../types/api";
 
 interface AuthContextValue {
@@ -10,6 +10,7 @@ interface AuthContextValue {
   // route based on role immediately, without waiting an extra render for
   // context state to catch up.
   login: (email: string, password: string) => Promise<User>;
+  loginDemo: () => User;
   logout: () => void;
 }
 
@@ -50,16 +51,26 @@ function ensureAdminOverride(u: User): User {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  // "loading" only when there's actually a token to verify against
+  const [user, setUser] = useState<User | null>(() => {
+    if (demoStorage.isDemoSession() && isDemoEnabled()) {
+      return demoStorage.getDemoUser();
+    }
+    return null;
+  });
+  // "loading" only when there's actually a non-demo token to verify against
   // /auth/me — with no token, there's nothing async to wait on, so the
   // initial state is derived synchronously instead of via an effect.
-  const [status, setStatus] = useState<AuthContextValue["status"]>(() =>
-    tokenStorage.getAccessToken() ? "loading" : "unauthenticated",
-  );
+  const [status, setStatus] = useState<AuthContextValue["status"]>(() => {
+    if (demoStorage.isDemoSession() && isDemoEnabled()) {
+      return "authenticated";
+    }
+    return tokenStorage.getAccessToken() ? "loading" : "unauthenticated";
+  });
 
   const logout = useCallback(() => {
     authApi.logout();
+    demoStorage.clearDemoSession();
+    tokenStorage.clear();
     setUser(null);
     setStatus("unauthenticated");
   }, []);
@@ -69,6 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [logout]);
 
   useEffect(() => {
+    if (demoStorage.isDemoSession() && isDemoEnabled()) {
+      const demoUser = demoStorage.getDemoUser();
+      if (demoUser) {
+        setUser(demoUser);
+        setStatus("authenticated");
+        return;
+      }
+    }
     if (!tokenStorage.getAccessToken()) return;
     authApi
       .me()
@@ -79,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         tokenStorage.clear();
+        demoStorage.clearDemoSession();
         setStatus("unauthenticated");
       });
   }, []);
@@ -92,7 +112,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return adminMe;
   }, []);
 
-  const value = useMemo(() => ({ user, status, login, logout }), [user, status, login, logout]);
+  const loginDemo = useCallback(() => {
+    const demoUser: User & { name: string } = {
+      id: "demo-admin",
+      name: "Demo Administrator",
+      full_name: "Demo Administrator",
+      email: "demo@kavach.local",
+      role: "admin",
+      is_active: true,
+      auth_provider: "demo",
+      role_display_name: "Administrator",
+      permissions: ["*"],
+    };
+    demoStorage.setDemoSession(demoUser);
+    setUser(demoUser);
+    setStatus("authenticated");
+    return demoUser;
+  }, []);
+
+  const value = useMemo(() => ({ user, status, login, loginDemo, logout }), [user, status, login, loginDemo, logout]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+

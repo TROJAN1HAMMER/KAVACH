@@ -71,3 +71,12 @@ export default defineConfig([
   },
 ])
 ```
+
+## Demo Mode (Development Only)
+
+For demos and presentations, set `VITE_ENABLE_DEMO_LOGIN=true` in `.env`.
+This displays a **🚀 Enter Demo Mode** button on `/login` that populates a full administrator session locally without modifying backend logic.
+
+> [!CAUTION]
+> **`VITE_ENABLE_DEMO_LOGIN` MUST NEVER BE ENABLED IN PRODUCTION.**
+

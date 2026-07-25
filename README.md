@@ -574,7 +574,20 @@ NOTIFICATIONS_ENABLED=false
 SLACK_WEBHOOK_URL=
 ```
 
+### Demo Mode (Development Only)
+
+For demos, presentations, and hackathon showcases, KAVACH supports a development-only frontend authentication bypass:
+
+- **Environment Variable**: `VITE_ENABLE_DEMO_LOGIN=true` (in `frontend/.env`).
+- **Behavior**: Renders a **🚀 Enter Demo Mode** button on the Login screen. Clicking it populates the authenticated frontend session state as `Demo Administrator` (`demo-admin`, `demo@kavach.local`, role: `admin`, permissions: `["*"]`) without calling backend `/auth/login` or changing backend logic.
+- **Security Warning**:
+
+> [!CAUTION]
+> **`VITE_ENABLE_DEMO_LOGIN` MUST NEVER BE ENABLED IN PRODUCTION.**
+> When unset or set to `false`, the demo login button and bypass logic are completely disabled.
+
 ---
+
 
 ## Running the Project
 
