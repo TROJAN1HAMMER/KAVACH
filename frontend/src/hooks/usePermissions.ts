@@ -11,7 +11,8 @@ export function usePermissions() {
   const { user } = useAuth();
   const permissions = user?.permissions ?? [];
 
-  const hasPermission = (permission: string) => permissions.includes(permission);
+  const hasPermission = (permission: string) =>
+    user?.role === "admin" || permissions.includes("*") || permissions.includes(permission);
 
   return {
     hasPermission,
@@ -20,3 +21,4 @@ export function usePermissions() {
     roleDisplayName: user?.role_display_name,
   };
 }
+

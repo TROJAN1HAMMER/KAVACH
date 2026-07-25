@@ -122,13 +122,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       is_active: true,
       auth_provider: "demo",
       role_display_name: "Administrator",
-      permissions: ["*"],
+      permissions: [
+        "*",
+        "user:manage",
+        "scan:create",
+        "scan:read",
+        "scan:cancel",
+        "finding:read",
+        "finding:update",
+        "report:read",
+        "report:download",
+        "repository:create",
+        "repository:read",
+        "repository:update",
+        "repository:delete",
+        "audit_log:read",
+        "knowledge:read",
+        "knowledge:write",
+      ],
     };
     demoStorage.setDemoSession(demoUser);
     setUser(demoUser);
     setStatus("authenticated");
     return demoUser;
   }, []);
+
 
   const value = useMemo(() => ({ user, status, login, loginDemo, logout }), [user, status, login, loginDemo, logout]);
 
