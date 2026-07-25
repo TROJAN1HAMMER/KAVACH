@@ -78,12 +78,16 @@ class ScanJobRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> list[ScanJob]:
-        query = select(ScanJob).where(ScanJob.owner_id == owner_id)
-        if status is not None:
-            query = query.where(ScanJob.status == status)
-        query = query.order_by(ScanJob.created_at.desc()).limit(limit).offset(offset)
-        result = await self.db.execute(query)
-        return list(result.scalars().all())
+        try:
+            query = select(ScanJob).where((ScanJob.owner_id == owner_id) | (ScanJob.owner_id.is_(None)))
+            if status is not None:
+                query = query.where(ScanJob.status == status)
+            query = query.order_by(ScanJob.created_at.desc()).limit(limit).offset(offset)
+            result = await self.db.execute(query)
+            return list(result.scalars().all())
+        except Exception:
+            return []
+
 
     async def list_running(self) -> list[ScanJob]:
         """

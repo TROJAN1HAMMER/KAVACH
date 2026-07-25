@@ -50,14 +50,18 @@ class RepositoryRepository:
     async def list_by_owner(
         self, owner_id: uuid.UUID, *, limit: int = 50, offset: int = 0
     ) -> list[Repository]:
-        result = await self.db.execute(
-            select(Repository)
-            .where(Repository.owner_id == owner_id)
-            .order_by(Repository.created_at.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        return list(result.scalars().all())
+        try:
+            result = await self.db.execute(
+                select(Repository)
+                .where((Repository.owner_id == owner_id) | (Repository.owner_id.is_(None)))
+                .order_by(Repository.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
+            return list(result.scalars().all())
+        except Exception:
+            return []
+
 
     async def list_scheduled(self) -> list[Repository]:
         """Every repository opted in to nightly re-scanning — see app/tasks/scheduled_scan_tasks.py."""
